@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Scanner Anti Gagal</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #121212; color: white; margin: 0; padding: 20px; }
+        #reader { width: 100%; max-width: 350px; margin: 20px auto; border-radius: 15px; overflow: hidden; background: #1e1e1e; border: 2px solid #00ff88; }
+        .btn { background: #00ff88; color: black; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        #status { margin-top: 20px; padding: 15px; border-radius: 10px; background: #252525; min-height: 50px; }
+        .sukses { color: #00ff88; border: 1px solid #00ff88; }
+        .gagal { color: #ff4757; border: 1px solid #ff4757; }
+    </style>
+</head>
+<body>
+
+    <h2>QR Pay Simulasi</h2>
+    <p style="color: #bbb;">Arahkan ke QR berisi teks "200"</p>
+
+    <div id="reader"></div>
+
+    <div id="status">Menyiapkan Kamera...</div>
+    
+    <button class="btn" onclick="mulaiUlang()">Refresh Kamera</button>
+
+    <script>
+        const html5QrCode = new Html5Qrcode("reader");
+        const statusElt = document.getElementById('status');
+
+        const qrConfig = { 
+            fps: 20, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0 
+        };
+
+        function mulaiScanner() {
+            statusElt.innerText = "Membuka Kamera...";
+            
+            // Menggunakan facingMode "environment" untuk kamera belakang
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                qrConfig, 
+                (decodedText) => {
+                    // JIKA BERHASIL SCAN
+                    if (decodedText.trim() === "200") {
+                        statusElt.innerHTML = "<div class='sukses'>✅ PEMBAYARAN BERHASIL!<br>Rp 200 Terbayar</div>";
+                        // Berhenti agar tidak scan berkali-kali
+                        html5QrCode.stop();
+                    } else {
+                        statusElt.innerHTML = "<div class='gagal'>❌ KODE SALAH<br>Isi: " + decodedText + "</div>";
+                    }
+                },
+                (errorMessage) => {
+                    // Ini berjalan terus saat mencari QR, biarkan kosong agar tidak spam
+                }
+            ).catch(err => {
+                // JIKA GAGAL BUKA KAMERA
+                statusElt.innerHTML = "<div class='gagal'>Gagal: " + err + "<br>Pastikan izin kamera aktif & pakai HTTPS/Localhost</div>";
+            });
+        }
+
+        function mulaiUlang() {
+            location.reload();
+        }
+
+        // Jalankan otomatis saat halaman siap
+        window.onload = mulaiScanner;
+    </script>
+</body>
+</html>
