@@ -3,68 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SalNew QR Sultan</title>
+    <title>SalNew Sultan - Anti Hilang</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #121212; color: white; margin: 0; padding: 20px; }
-        #reader { width: 100%; max-width: 350px; margin: 20px auto; border-radius: 15px; overflow: hidden; background: #1a1a1a; border: 2px solid #00ff88; }
-        .btn { background: #00ff88; color: black; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        #status { margin-top: 20px; padding: 15px; border-radius: 10px; background: #252525; min-height: 50px; }
-        .sukses { color: #00ff88; border: 1px solid #00ff88; padding: 10px; border-radius: 5px; }
-        .gagal { color: #ff4757; border: 1px solid #ff4757; padding: 10px; border-radius: 5px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: white; text-align: center; margin: 0; padding: 20px; }
+        .card { background: linear-gradient(135deg, #1e1e1e, #2d2d2d); border-radius: 20px; padding: 25px; border: 1px solid #00ff88; box-shadow: 0 10px 30px rgba(0,255,136,0.2); margin-bottom: 20px; }
+        h1 { color: #00ff88; margin: 0; font-size: 1.2rem; }
+        .saldo { font-size: 2.5rem; font-weight: bold; margin: 15px 0; color: #fff; }
+        #reader { width: 100%; max-width: 300px; margin: 20px auto; border-radius: 15px; border: 2px dashed #00ff88; overflow: hidden; }
+        .btn { background: #00ff88; color: black; border: none; padding: 15px 30px; border-radius: 12px; font-weight: bold; width: 100%; cursor: pointer; font-size: 1rem; margin-bottom: 10px; }
+        #status { margin-top: 15px; font-size: 0.9rem; color: #bbb; }
     </style>
 </head>
 <body>
 
-    <h2>SalNew Pay - SCAN QR</h2>
-    <p style="color: #bbb;">Arahkan ke QR Berisi Link atau Kode "200"</p>
+    <div class="card">
+        <h1>SALNEW SULTAN 💎</h1>
+        <div style="font-size: 0.8rem; color: #888;">Pemilik: Bustomi Alfarizi</div>
+        <div class="saldo" id="displaySaldo">Rp 0</div>
+        <button class="btn" onclick="tambahSaldoManual()">+ Top Up Rp 50.000</button>
+        <button class="btn" style="background: #ff4757;" onclick="resetSaldo()">Reset Saldo</button>
+    </div>
 
     <div id="reader"></div>
-    <div id="status">Menyiapkan Kamera...</div>
-    <button class="btn" onclick="location.reload()">Refresh Kamera</button>
+    <div id="status">Siap Scan Kode "200"...</div>
+    <button class="btn" style="background: #252525; color: white;" onclick="location.reload()">Refresh Kamera</button>
 
     <script>
-        const html5QrCode = new html5QrCode("reader");
-        const statusElt = document.getElementById('status');
+        // --- LOGIKA SIMPAN MEMORI HP ---
+        let saldoSaatIni = localStorage.getItem('saldoSalNew') ? parseInt(localStorage.getItem('saldoSalNew')) : 0;
 
-        const qrConfig = { fps: 20, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+        function updateTampilan() {
+            document.getElementById('displaySaldo').innerText = "Rp " + saldoSaatIni.toLocaleString('id-ID');
+            localStorage.setItem('saldoSalNew', saldoSaatIni);
+        }
 
-        function mulaiScanner() {
-            statusElt.innerText = "Membuka Kamera...";
-            
-            html5QrCode.start(
-                { facingMode: "environment" }, 
-                qrConfig,
-                (decodedText) => {
-                    // LOGIKA BARU: JIKA SCAN LINK (http)
-                    if (decodedText.startsWith("http")) {
-                        statusElt.innerHTML = "<div class='sukses'>✅ LINK DITEMUKAN!<br>Mengarahkan ke: " + decodedText + "</div>";
-                        
-                        // Berhenti scan agar tidak duplikat
-                        html5QrCode.stop();
+        function tambahSaldoManual() {
+            saldoSaatIni += 50000;
+            updateTampilan();
+        }
 
-                        // Tunggu 1 detik lalu buka link otomatis
-                        setTimeout(() => {
-                            window.location.href = decodedText.trim();
-                        }, 1200);
+        function resetSaldo() {
+            if(confirm("Yakin mau reset jadi Rp 0?")) {
+                saldoSaatIni = 0;
+                updateTampilan();
+            }
+        }
 
-                    } 
-                    // LOGIKA LAMA: JIKA SCAN KODE "200"
-                    else if (decodedText.trim() === "200") {
-                        statusElt.innerHTML = "<div class='sukses'>✅ PEMBAYARAN BERHASIL!<br>Rp 200 Terbayar</div>";
-                        html5QrCode.stop();
-                    } 
-                    // JIKA KODE SALAH
-                    else {
-                        statusElt.innerHTML = "<div class='gagal'>❌ KODE SALAH<br>Isi: " + decodedText + "</div>";
-                    }
+        // --- LOGIKA SCANNER ---
+        const html5QrCode = new Html5Qrcode("reader");
+        
+        function mulaiScan() {
+            html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: 250 }, (decodedText) => {
+                // Jika scan kode "200"
+                if (decodedText.trim() === "200") {
+                    document.getElementById('status').innerHTML = "<b style='color:#00ff88'>✅ PEMBAYARAN BERHASIL! +200rb</b>";
+                    saldoSaatIni += 200000;
+                    updateTampilan();
+                    html5QrCode.stop();
+                } 
+                // Jika scan link
+                else if (decodedText.startsWith("http")) {
+                    window.location.href = decodedText;
+                } else {
+                    document.getElementById('status').innerHTML = "❌ Kode Salah: " + decodedText;
                 }
-            ).catch(err => {
-                statusElt.innerHTML = "<div class='gagal'>Gagal: Pastikan izin kamera aktif!</div>";
+            }).catch(err => {
+                document.getElementById('status').innerHTML = "Kamera tidak aktif.";
             });
         }
 
-        window.onload = mulaiScanner;
+        // Jalankan saat web dibuka
+        window.onload = () => {
+            updateTampilan();
+            mulaiScan();
+        };
     </script>
 </body>
 </html>
