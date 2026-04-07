@@ -52,9 +52,7 @@
                 const data = snap.val();
                 if (data) {
                     currentBalance = data.saldo;
-                    document.getElementById('u-balance').innerText = (user === "Tomi") ? "∞ Infinity" : "Rp " + data.saldo.toLocaleString('id-ID');
-                }
-            });
+                    document.getElementById('u-balance').innerText = (user === "Tomi") ? "Rp 1.000.000.000" : "Rp " + data.saldo.toLocaleString('id-ID');
 
             const hRef = query(ref(db, 'history/' + phone), limitToLast(8));
             onValue(hRef, (snap) => {
