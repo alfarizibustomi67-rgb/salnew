@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SalNew V.110.18 - Real Sultan</title>
+    <title>SalNew V.110.19 - Sportif Edition</title>
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -29,7 +29,7 @@
         const userDatabase = {
             "Tomi": { pass: "11", phone: "081212" },
             "T": { pass: "12", phone: "087878" },
-            "Dafa": { pass: "1122", phone: "089999" } // Update akun Dafa
+            "Dafa": { pass: "1122", phone: "089999" }
         };
 
         let currentBalance = 0;
@@ -71,9 +71,9 @@
             onValue(ref(db, 'users/' + phone), (snap) => {
                 const data = snap.val();
                 if (data) {
-                    currentBalance = data.saldo;
-                    // FIX: Saldo Tomi sekarang angka Rp 100.000 bukan infinity
-                    document.getElementById('u-balance').innerText = (user === "Tomi") ? "Rp 100.000" : "Rp " + data.saldo.toLocaleString('id-ID');
+                    currentBalance = data.saldo || 0;
+                    // SEKARANG SEMUA USER (TERMASUK TOMI) SALDONYA BERDASARKAN DATABASE
+                    document.getElementById('u-balance').innerText = "Rp " + currentBalance.toLocaleString('id-ID');
                     if(user === "Tomi") document.getElementById('vip-tag').style.display = 'inline-block';
                 }
             });
@@ -107,19 +107,34 @@
         window.actionKirim = async () => {
             const { value: target } = await Swal.fire({ title: 'Transfer', input: 'text', inputPlaceholder: 'Nomor HP' });
             const { value: amt } = await Swal.fire({ title: 'Jumlah', input: 'number' });
+            
             if (target && amt > 0) {
+                const amount = parseInt(amt);
                 const sender = sessionStorage.getItem('currentUser');
+                const senderPhone = userDatabase[sender].phone;
+
+                // CEK SALDO CUKUP ATAU TIDAK
+                if (currentBalance < amount) {
+                    Swal.fire('Gagal', 'Saldo tidak cukup untuk transfer sportif!', 'error');
+                    return;
+                }
+
                 const tRef = ref(db, 'users/' + target);
                 const tSnap = await get(tRef);
+                
                 if (tSnap.exists()) {
                     const now = new Date().toLocaleString();
-                    const amount = parseInt(amt);
+                    
+                    // 1. Tambah saldo penerima
                     await update(tRef, { saldo: (tSnap.val().saldo || 0) + amount });
                     push(ref(db, 'history/' + target), { type: 'MASUK', amt: amount, date: now, note: 'Dari ' + sender });
-                    if(sender !== "Tomi") await update(ref(db, 'users/' + userDatabase[sender].phone), { saldo: currentBalance - amount });
-                    push(ref(db, 'history/' + userDatabase[sender].phone), { type: 'KELUAR', amt: amount, date: now, note: 'Kirim ke ' + target });
-                    Swal.fire('Berhasil!', 'Transfer Sukses', 'success');
-                } else { Swal.fire('Error', 'Nomor Tidak Ada', 'error'); }
+                    
+                    // 2. Kurangi saldo pengirim (Sekarang Tomi juga ikut dikurangi)
+                    await update(ref(db, 'users/' + senderPhone), { saldo: currentBalance - amount });
+                    push(ref(db, 'history/' + senderPhone), { type: 'KELUAR', amt: amount, date: now, note: 'Kirim ke ' + target });
+                    
+                    Swal.fire('Berhasil!', 'Transfer Berhasil & Saldo Terpotong', 'success');
+                } else { Swal.fire('Error', 'Nomor HP Tujuan Tidak Terdaftar', 'error'); }
             }
         };
 
@@ -151,37 +166,37 @@
 
 <div id="login-screen">
     <div style="width:100%; text-align:center;">
-        <div style="background:var(--blue); width:80px; height:80px; border-radius:30px; margin:0 auto 20px auto; display:flex; align-items:center; justify-content:center; color:#fff;"><i data-lucide="wallet" size="40"></i></div>
-        <h2 style="color:#222;">SalNew</h2>
-        <p style="font-size:12px; color:#aaa; margin-bottom:30px;">V.110.18 - Real Balance</p>
+        <div style="background:var(--blue); width:80px; height:80px; border-radius:30px; margin:0 auto 20px auto; display:flex; align-items:center; justify-content:center; color:#fff;"><i data-lucide="shield-check" size="40"></i></div>
+        <h2 style="color:#222;">SalNew Sportif</h2>
+        <p style="font-size:12px; color:#aaa; margin-bottom:30px;">V.110.19 - Real Transaction</p>
         <input type="text" id="inp-user" placeholder="Username">
         <input type="password" id="inp-pass" placeholder="PIN">
-        <button class="btn-l" onclick="login()">Masuk</button>
+        <button class="btn-l" onclick="login()">Buka SalNew</button>
     </div>
 </div>
 
 <div id="main-app" class="app">
     <div class="header">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div><p style="font-size:12px; opacity:0.8;">Selamat Datang,</p><h3 style="font-size:20px;"><span id="u-name"></span> <span id="vip-tag" style="display:none;">VIP</span></h3></div>
-            <div onclick="logout()" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:15px;"><i data-lucide="log-out" size="20"></i></div>
+            <div><p style="font-size:12px; opacity:0.8;">User Aktif,</p><h3 style="font-size:20px;"><span id="u-name"></span> <span id="vip-tag" style="display:none;">VIP</span></h3></div>
+            <div onclick="logout()" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:15px;"><i data-lucide="power" size="20"></i></div>
         </div>
         <div class="grid-menu">
             <div class="m-item" onclick="actionKirim()"><div class="m-icon"><i data-lucide="send"></i></div><p style="font-size:11px; font-weight:600;">Kirim</p></div>
             <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="gift"></i></div><p style="font-size:11px; font-weight:600;">Kaget</p></div>
             <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="qr-code"></i></div><p style="font-size:11px; font-weight:600;">Scan</p></div>
-            <div class="m-item" onclick="logout()"><div class="m-icon"><i data-lucide="power"></i></div><p style="font-size:11px; font-weight:600;">Keluar</p></div>
+            <div class="m-item" onclick="logout()"><div class="m-icon"><i data-lucide="log-out"></i></div><p style="font-size:11px; font-weight:600;">Logout</p></div>
         </div>
     </div>
     <div class="s-card">
-        <p style="font-size: 11px; color:#999; font-weight: 800;">TOTAL SALDO</p>
+        <p style="font-size: 11px; color:#999; font-weight: 800;">SALDO ANDA</p>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
             <h2 id="u-balance" style="font-size: 32px; color:#222;">Rp 0</h2>
-            <button onclick="showMyQR()" style="background:var(--blue); color:#fff; border:none; padding:10px 20px; border-radius:15px; font-weight:800;">SCAN</button>
+            <button onclick="showMyQR()" style="background:var(--blue); color:#fff; border:none; padding:10px 20px; border-radius:15px; font-weight:800;">QR</button>
         </div>
     </div>
     <div class="history">
-        <h4 style="font-size:15px; font-weight:800; color:#222; margin-bottom:15px;">Riwayat</h4>
+        <h4 style="font-size:15px; font-weight:800; color:#222; margin-bottom:15px;">Riwayat Transaksi</h4>
         <div id="hist-list"></div>
     </div>
 </div>
