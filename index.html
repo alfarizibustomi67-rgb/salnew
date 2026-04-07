@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SalNew V.100.4 Premium</title>
+    <title>SalNew V.100.7 Clean</title>
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -27,11 +27,7 @@
         
         const userDatabase = {
             "Tomi": { pass: "11", phone: "081212" },
-            "User1": { pass: "121212", phone: "081111" },
-            "User2": { pass: "232323", phone: "082222" },
-            "User3": { pass: "343434", phone: "083333" },
-            "User4": { pass: "454545", phone: "084444" },
-            "User5": { pass: "565656", phone: "085555" }
+            "T": { pass: "12", phone: "085858" }
         };
 
         let currentBalance = 0;
@@ -55,14 +51,8 @@
                 const data = snap.val();
                 if (data) {
                     currentBalance = data.saldo;
-                    // AKUN TOMI GANTI SALDO 100.000 (TAMPILAN)
                     document.getElementById('u-balance').innerText = (user === "Tomi") ? "Rp 100.000" : "Rp " + data.saldo.toLocaleString('id-ID');
-                    
-                    // TETAP AKUN PREMIUM VIP UNTUK TOMI
-                    if(user === "Tomi") {
-                        document.getElementById('vip-tag').style.display = 'inline-block';
-                        document.getElementById('vip-tag').innerText = "PREMIUM VIP";
-                    }
+                    if(user === "Tomi") document.getElementById('vip-tag').style.display = 'inline-block';
                 }
             });
 
@@ -73,16 +63,7 @@
                 snap.forEach((child) => {
                     const item = child.val();
                     const isIn = item.type === "MASUK";
-                    list.innerHTML = `
-                        <div class="h-card">
-                            <div class="h-icon ${isIn ? 'in' : 'out'}"><i data-lucide="${isIn ? 'arrow-down-left' : 'arrow-up-right'}"></i></div>
-                            <div style="flex:1; margin-left:15px;">
-                                <p style="font-weight:700; font-size:14px;">${item.note || 'Transaksi SalNew'}</p>
-                                <p style="font-size:10px; color:#aaa;">${item.date}</p>
-                            </div>
-                            <p style="font-weight:800; color:${isIn ? '#2ecc71' : '#e74c3c'}">${isIn ? '+' : '-'} Rp ${item.amt.toLocaleString()}</p>
-                        </div>
-                    ` + list.innerHTML;
+                    list.innerHTML = `<div class="h-card"><div class="h-icon ${isIn ? 'in' : 'out'}"><i data-lucide="${isIn ? 'arrow-down-left' : 'arrow-up-right'}"></i></div><div style="flex:1; margin-left:15px;"><p style="font-weight:700; font-size:13px;">${item.note || 'Transaksi'}</p><p style="font-size:10px; color:#aaa;">${item.date}</p></div><p style="font-weight:800; color:${isIn ? '#2ecc71' : '#e74c3c'}">${isIn ? '+' : '-'} Rp ${item.amt.toLocaleString()}</p></div>` + list.innerHTML;
                 });
                 lucide.createIcons();
             });
@@ -93,36 +74,15 @@
             const phone = userDatabase[user].phone;
             if (user === "Tomi" || currentBalance >= amount) {
                 const now = new Date().toLocaleString();
-                if(user !== "Tomi") {
-                    await update(ref(db, 'users/' + phone), { saldo: currentBalance - amount });
-                }
+                if(user !== "Tomi") await update(ref(db, 'users/' + phone), { saldo: currentBalance - amount });
                 await push(ref(db, 'history/' + phone), { type: 'KELUAR', amt: amount, date: now, note: note });
-                Swal.fire('Berhasil!', note, 'success');
+                Swal.fire('Sukses!', note, 'success');
                 return true;
-            } else {
-                Swal.fire('Gagal', 'Saldo tidak mencukupi', 'error');
-                return false;
-            }
+            } else { Swal.fire('Gagal', 'Saldo Kurang', 'error'); return false; }
         }
 
-        window.actionPulsa = async () => {
-            const { value: target } = await Swal.fire({ title: 'Beli Pulsa', input: 'text', inputPlaceholder: 'Nomor HP' });
-            if (!target) return;
-            const { value: nominal } = await Swal.fire({
-                title: 'Nominal',
-                input: 'select',
-                inputOptions: { '5000': '5.000', '10000': '10.000', '25000': '25.000' }
-            });
-            if (nominal) processTransaction(parseInt(nominal), 'Beli Pulsa ke ' + target);
-        };
-
-        window.actionScan = async () => {
-            const { value: amt } = await Swal.fire({ title: 'Bayar QRIS', input: 'number', inputPlaceholder: 'Jumlah' });
-            if (amt > 0) processTransaction(parseInt(amt), 'Bayar Merchant QR');
-        };
-
         window.actionKirim = async () => {
-            const { value: target } = await Swal.fire({ title: 'Kirim ke HP', input: 'text' });
+            const { value: target } = await Swal.fire({ title: 'Tujuan Nomor', input: 'text' });
             const { value: amt } = await Swal.fire({ title: 'Jumlah Rp', input: 'number' });
             if (target && amt > 0) {
                 const sender = sessionStorage.getItem('currentUser');
@@ -133,12 +93,12 @@
                     if (sender === "Tomi" || currentBalance >= amount) {
                         const now = new Date().toLocaleString();
                         await update(tRef, { saldo: tSnap.val().saldo + amount });
-                        push(ref(db, 'history/' + target), { type: 'MASUK', amt: amount, date: now, note: 'Terima dari ' + sender });
+                        push(ref(db, 'history/' + target), { type: 'MASUK', amt: amount, date: now, note: 'Dari ' + sender });
                         if(sender !== "Tomi") await update(ref(db, 'users/' + userDatabase[sender].phone), { saldo: currentBalance - amount });
                         push(ref(db, 'history/' + userDatabase[sender].phone), { type: 'KELUAR', amt: amount, date: now, note: 'Kirim ke ' + target });
                         Swal.fire('Berhasil!', 'Saldo Terkirim!', 'success');
                     } else { Swal.fire('Gagal', 'Saldo Kurang', 'error'); }
-                } else { Swal.fire('Error', 'Nomor Salah', 'error'); }
+                } else { Swal.fire('Error', 'Nomor Tidak Ada', 'error'); }
             }
         };
 
@@ -148,81 +108,78 @@
     <style>
         :root { --blue: #108ee9; }
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background: #f0f4f8; display: flex; justify-content: center; }
-        .app { width: 100%; max-width: 480px; min-height: 100vh; background: #fff; display: none; position: relative; }
-        .header { background: var(--blue); color: #fff; padding: 60px 25px 40px 25px; border-radius: 0 0 45px 45px; position: relative; overflow: hidden; }
-        #liquid-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.4; pointer-events: none; }
-        .grid-menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; position: relative; z-index: 2; }
-        .m-item { text-align: center; cursor: pointer; transition: 0.2s; }
-        .m-icon { background: rgba(255,255,255,0.2); padding: 12px; border-radius: 18px; display: inline-block; margin-bottom: 8px; backdrop-filter: blur(10px); }
-        .s-card { background: #fff; margin: -25px 20px 25px 20px; padding: 25px; border-radius: 30px; box-shadow: 0 15px 30px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; border: 1px solid #f1f1f1; position: relative; z-index: 5; }
-        .history { padding: 0 25px 50px 25px; }
-        .h-card { display: flex; align-items: center; padding: 15px; background: #fafafa; border-radius: 20px; margin-bottom: 10px; }
-        .h-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        body { background: #f8fbff; display: flex; justify-content: center; }
+        .app { width: 100%; max-width: 480px; min-height: 100vh; background: #fff; display: none; }
+        
+        .header { background: var(--blue); color: #fff; padding: 50px 25px 30px 25px; border-radius: 0 0 40px 40px; position: relative; }
+        
+        .s-card { 
+            background: #fff; 
+            margin: -25px 20px 25px 20px; 
+            padding: 25px; 
+            border-radius: 25px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05); 
+            border: 1px solid #f1f1f1;
+            position: relative;
+            z-index: 5;
+        }
+
+        .grid-menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px; }
+        .m-item { text-align: center; cursor: pointer; }
+        .m-icon { background: rgba(255,255,255,0.15); padding: 12px; border-radius: 15px; display: inline-block; margin-bottom: 5px; backdrop-filter: blur(5px); }
+
+        .history { padding: 25px; }
+        .h-card { display: flex; align-items: center; padding: 15px; background: #f9f9f9; border-radius: 18px; margin-bottom: 10px; }
+        .h-icon { width: 35px; height: 35px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
         .h-icon.in { background: #e8f8f0; color: #2ecc71; }
         .h-icon.out { background: #fdf2f2; color: #e74c3c; }
-        #vip-tag { background: linear-gradient(to right, #ffd700, #ffa500); color: #fff; font-size: 9px; padding: 3px 8px; border-radius: 10px; margin-left: 5px; font-weight: 800; display: none; }
-        #login-screen { width: 100%; max-width: 480px; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px; background: #fff; }
-        input { width: 100%; padding: 18px; margin: 10px 0; border: none; background: #f0f7ff; border-radius: 20px; outline: none; font-weight: 600; }
-        .btn-l { width: 100%; padding: 18px; background: var(--blue); color: #fff; border: none; border-radius: 20px; font-weight: 800; margin-top: 15px; }
+
+        #vip-tag { background: #ffd700; color: #000; font-size: 9px; padding: 2px 6px; border-radius: 5px; font-weight: 900; display: none; }
+        #login-screen { width: 100%; max-width: 480px; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px; }
+        input { width: 100%; padding: 18px; margin: 10px 0; border: none; background: #f0f4f8; border-radius: 15px; outline: none; font-weight: 600; }
+        .btn-l { width: 100%; padding: 18px; background: var(--blue); color: #fff; border: none; border-radius: 15px; font-weight: 800; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
     <div style="width:100%; text-align:center;">
-        <h1 style="color:var(--blue); font-size:35px;">SalNew Sultan</h1>
-        <p style="color:#aaa; font-size:12px; margin-bottom:30px;">Premium V.100.4</p>
+        <h2 style="color:var(--blue);">SalNew Clean</h2>
+        <p style="font-size:12px; color:#aaa; margin-bottom:30px;">V.100.7 - No Card Edition</p>
         <input type="text" id="inp-user" placeholder="Username">
         <input type="password" id="inp-pass" placeholder="PIN">
-        <button class="btn-l" onclick="login()">MASUK</button>
+        <button class="btn-l" onclick="login()">LOGIN</button>
     </div>
 </div>
 
 <div id="main-app" class="app">
     <div class="header">
-        <canvas id="liquid-bg"></canvas>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px; position:relative; z-index:2;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
             <h3>Halo, <span id="u-name"></span> <span id="vip-tag">VIP</span></h3>
-            <div onclick="logout()"><i data-lucide="log-out" style="width:20px;"></i></div>
+            <i data-lucide="bell" style="width:20px; opacity:0.6;"></i>
         </div>
         <div class="grid-menu">
-            <div class="m-item" onclick="actionKirim()"><div class="m-icon"><i data-lucide="send"></i></div><p style="font-size:10px; font-weight:700;">Kirim</p></div>
-            <div class="m-item" onclick="actionPulsa()"><div class="m-icon"><i data-lucide="smartphone"></i></div><p style="font-size:10px; font-weight:700;">Pulsa</p></div>
-            <div class="m-item" onclick="Swal.fire('Top Up','Hubungi Admin Tomi','info')"><div class="m-icon"><i data-lucide="plus-circle"></i></div><p style="font-size:10px; font-weight:700;">Top Up</p></div>
-            <div class="m-item" onclick="actionScan()"><div class="m-icon"><i data-lucide="qr-code"></i></div><p style="font-size:10px; font-weight:700;">Pindai</p></div>
+            <div class="m-item" onclick="actionKirim()"><div class="m-icon"><i data-lucide="send"></i></div><p style="font-size:10px;">Kirim</p></div>
+            <div class="m-item" onclick="Swal.fire('Pulsa','Segera Hadir','info')"><div class="m-icon"><i data-lucide="smartphone"></i></div><p style="font-size:10px;">Pulsa</p></div>
+            <div class="m-item" onclick="Swal.fire('Scan','Gunakan Tombol Bayar','info')"><div class="m-icon"><i data-lucide="qr-code"></i></div><p style="font-size:10px;">Scan</p></div>
+            <div class="m-item" onclick="logout()"><div class="m-icon"><i data-lucide="log-out"></i></div><p style="font-size:10px;">Keluar</p></div>
         </div>
     </div>
 
     <div class="s-card">
-        <div>
-            <p style="font-size: 10px; color:#aaa; font-weight: 800;">SALDO SULTAN</p>
-            <h2 id="u-balance" style="font-size: 28px; color:#222; margin-top: 5px;">Rp 0</h2>
+        <p style="font-size: 10px; color:#aaa; font-weight: 800;">SALDO SULTAN</p>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+            <h2 id="u-balance" style="font-size: 26px; color:#222;">Rp 0</h2>
+            <button onclick="actionKirim()" style="background:var(--blue); color:#fff; border:none; padding:8px 15px; border-radius:12px; font-size:11px; font-weight:bold;">BAYAR</button>
         </div>
-        <button onclick="actionScan()" style="background:var(--blue); color:#fff; border:none; padding:10px 20px; border-radius:15px; font-weight:bold; font-size:12px;">BAYAR</button>
     </div>
 
     <div class="history">
-        <h4 style="margin-bottom:15px; font-size:14px; color:#333;">Riwayat Transaksi</h4>
+        <h4 style="font-size:14px; color:#333; margin-bottom:15px;">Riwayat Transaksi</h4>
         <div id="hist-list"></div>
     </div>
 </div>
 
-<script>
-    const canvas = document.getElementById('liquid-bg');
-    const ctx = canvas.getContext('2d');
-    let particles = [];
-    function init() {
-        canvas.width = canvas.parentElement.offsetWidth;
-        canvas.height = canvas.parentElement.offsetHeight;
-        for(let i=0; i<15; i++) particles.push({x:Math.random()*canvas.width, y:canvas.height+Math.random()*100, s:Math.random()*30+10, sp:Math.random()*1+0.5});
-    }
-    function draw() {
-        ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        particles.forEach(p => { p.y -= p.sp; if(p.y < -50) p.y = canvas.height+50; ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, Math.PI*2); ctx.fill(); });
-        requestAnimationFrame(draw);
-    }
-    init(); draw(); lucide.createIcons();
-</script>
+<script>lucide.createIcons();</script>
 </body>
 </html>
