@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SalNew V.110.14 - Auto QR</title>
+    <title>SalNew V.110.18 - Real Sultan</title>
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -28,8 +28,29 @@
         
         const userDatabase = {
             "Tomi": { pass: "11", phone: "081212" },
-            "T": { pass: "12", phone: "087878" }
+            "T": { pass: "12", phone: "087878" },
+            "Dafa": { pass: "1122", phone: "089999" } // Update akun Dafa
         };
+
+        let currentBalance = 0;
+        const sndIn = new Audio('https://assets.mixkit.co/active_storage/sfx/2015/2015-preview.mp3');
+
+        async function checkDanaKaget(phone) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const kagetAmt = urlParams.get('kaget');
+            if (kagetAmt && !sessionStorage.getItem('kagetClaimed')) {
+                const amount = parseInt(kagetAmt);
+                const userRef = ref(db, 'users/' + phone);
+                const snap = await get(userRef);
+                const newTotal = (snap.val().saldo || 0) + amount;
+                await update(userRef, { saldo: newTotal });
+                await push(ref(db, 'history/' + phone), { type: 'MASUK', amt: amount, date: new Date().toLocaleString(), note: 'DANA Kaget!' });
+                sndIn.play();
+                Swal.fire({ title: 'DANA Kaget!', text: 'Dapat Rp ' + amount.toLocaleString(), icon: 'success' });
+                sessionStorage.setItem('kagetClaimed', 'true');
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
 
         window.login = function() {
             const u = document.getElementById('inp-user').value;
@@ -45,16 +66,19 @@
             document.getElementById('main-app').style.display = 'block';
             document.getElementById('u-name').innerText = user;
             const phone = userDatabase[user].phone;
+            checkDanaKaget(phone);
 
             onValue(ref(db, 'users/' + phone), (snap) => {
                 const data = snap.val();
                 if (data) {
+                    currentBalance = data.saldo;
+                    // FIX: Saldo Tomi sekarang angka Rp 100.000 bukan infinity
                     document.getElementById('u-balance').innerText = (user === "Tomi") ? "Rp 100.000" : "Rp " + data.saldo.toLocaleString('id-ID');
                     if(user === "Tomi") document.getElementById('vip-tag').style.display = 'inline-block';
                 }
             });
 
-            const hRef = query(ref(db, 'history/' + phone), limitToLast(10));
+            const hRef = query(ref(db, 'history/' + phone), limitToLast(8));
             onValue(hRef, (snap) => {
                 const list = document.getElementById('hist-list');
                 list.innerHTML = "";
@@ -67,29 +91,15 @@
             });
         }
 
-        // FUNGSI TAMPILKAN QR DANA KAGET
         window.showMyQR = async () => {
-            const { value: amt } = await Swal.fire({
-                title: 'Bikin DANA Kaget',
-                input: 'number',
-                inputPlaceholder: 'Masukkan Nominal (Misal: 5000)',
-                showCancelButton: true
-            });
-
+            const { value: amt } = await Swal.fire({ title: 'Bikin DANA Kaget', input: 'number', inputPlaceholder: 'Nominal Rp', showCancelButton: true });
             if (amt) {
-                // Ganti URL ini dengan link GitHub Pages kamu nanti
-                const myLink = `https://bustomi.github.io/salnew/?kaget=${amt}`;
-                
+                const currentUrl = window.location.origin + window.location.pathname;
+                const myLink = `${currentUrl}?kaget=${amt}`;
                 Swal.fire({
-                    title: 'Scan QR Ini!',
-                    html: '<div id="qrcode" style="display:flex; justify-content:center; margin:20px 0;"></div><p style="font-size:12px; color:#666;">Scan pakai Google Lens/Camera untuk klaim Rp ' + parseInt(amt).toLocaleString() + '</p>',
-                    didOpen: () => {
-                        new QRCode(document.getElementById("qrcode"), {
-                            text: myLink,
-                            width: 180,
-                            height: 180
-                        });
-                    }
+                    title: 'Scan QR SalNew',
+                    html: '<div id="qrcode" style="display:flex; justify-content:center; margin:20px 0;"></div><p style="font-size:12px; color:#666;">Scan untuk klaim Rp ' + parseInt(amt).toLocaleString() + '</p>',
+                    didOpen: () => { new QRCode(document.getElementById("qrcode"), { text: myLink, width: 180, height: 180 }); }
                 });
             }
         };
@@ -103,9 +113,12 @@
                 const tSnap = await get(tRef);
                 if (tSnap.exists()) {
                     const now = new Date().toLocaleString();
-                    await update(tRef, { saldo: (tSnap.val().saldo || 0) + parseInt(amt) });
-                    push(ref(db, 'history/' + target), { type: 'MASUK', amt: parseInt(amt), date: now, note: 'Dari ' + sender });
-                    Swal.fire('Berhasil!', 'Uang Terkirim', 'success');
+                    const amount = parseInt(amt);
+                    await update(tRef, { saldo: (tSnap.val().saldo || 0) + amount });
+                    push(ref(db, 'history/' + target), { type: 'MASUK', amt: amount, date: now, note: 'Dari ' + sender });
+                    if(sender !== "Tomi") await update(ref(db, 'users/' + userDatabase[sender].phone), { saldo: currentBalance - amount });
+                    push(ref(db, 'history/' + userDatabase[sender].phone), { type: 'KELUAR', amt: amount, date: now, note: 'Kirim ke ' + target });
+                    Swal.fire('Berhasil!', 'Transfer Sukses', 'success');
                 } else { Swal.fire('Error', 'Nomor Tidak Ada', 'error'); }
             }
         };
@@ -124,43 +137,42 @@
         .m-item { text-align: center; cursor: pointer; }
         .m-icon { background: rgba(255,255,255,0.2); padding: 12px; border-radius: 20px; display: inline-block; margin-bottom: 8px; backdrop-filter: blur(10px); }
         .history { padding: 0 25px 40px 25px; }
-        .h-card { display: flex; align-items: center; padding: 18px; background: #fff; border-radius: 25px; margin-bottom: 12px; }
-        .h-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        .h-card { display: flex; align-items: center; padding: 18px; background: #fff; border-radius: 22px; margin-bottom: 12px; }
+        .h-icon { width: 35px; height: 35px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
         .h-icon.in { background: #eefdf5; color: #2ecc71; }
         .h-icon.out { background: #fff5f5; color: #e74c3c; }
         #vip-tag { background: #ffcc00; color: #000; font-size: 10px; padding: 4px 10px; border-radius: 10px; font-weight: 900; }
         #login-screen { width: 100%; max-width: 480px; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px; background: #fff; }
         input { width: 100%; padding: 20px; margin: 10px 0; border: none; background: #f5f9ff; border-radius: 20px; outline: none; font-weight: 600; }
-        .btn-l { width: 100%; padding: 20px; background: var(--blue); color: #fff; border: none; border-radius: 20px; font-weight: 800; font-size: 16px; }
+        .btn-l { width: 100%; padding: 20px; background: var(--blue); color: #fff; border: none; border-radius: 20px; font-weight: 800; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
     <div style="width:100%; text-align:center;">
-        <div style="background:var(--blue); width:80px; height:80px; border-radius:30px; margin:0 auto 20px auto; display:flex; align-items:center; justify-content:center; color:#fff;"><i data-lucide="qr-code" size="40"></i></div>
-        <h2 style="color:#222;">SalNew Pro</h2>
-        <p style="font-size:12px; color:#aaa; margin-bottom:30px;">V.110.14 - QR Edition</p>
+        <div style="background:var(--blue); width:80px; height:80px; border-radius:30px; margin:0 auto 20px auto; display:flex; align-items:center; justify-content:center; color:#fff;"><i data-lucide="wallet" size="40"></i></div>
+        <h2 style="color:#222;">SalNew</h2>
+        <p style="font-size:12px; color:#aaa; margin-bottom:30px;">V.110.18 - Real Balance</p>
         <input type="text" id="inp-user" placeholder="Username">
         <input type="password" id="inp-pass" placeholder="PIN">
-        <button class="btn-l" onclick="login()">Masuk SalNew</button>
+        <button class="btn-l" onclick="login()">Masuk</button>
     </div>
 </div>
 
 <div id="main-app" class="app">
     <div class="header">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div><p style="font-size:12px; opacity:0.8;">Sultan SalNew,</p><h3 style="font-size:20px;"><span id="u-name"></span> <span id="vip-tag" style="display:none;">VIP</span></h3></div>
-            <div onclick="logout()" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:15px;"><i data-lucide="power" size="20"></i></div>
+            <div><p style="font-size:12px; opacity:0.8;">Selamat Datang,</p><h3 style="font-size:20px;"><span id="u-name"></span> <span id="vip-tag" style="display:none;">VIP</span></h3></div>
+            <div onclick="logout()" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:15px;"><i data-lucide="log-out" size="20"></i></div>
         </div>
         <div class="grid-menu">
             <div class="m-item" onclick="actionKirim()"><div class="m-icon"><i data-lucide="send"></i></div><p style="font-size:11px; font-weight:600;">Kirim</p></div>
             <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="gift"></i></div><p style="font-size:11px; font-weight:600;">Kaget</p></div>
-            <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="qr-code"></i></div><p style="font-size:11px; font-weight:600;">QRIS</p></div>
-            <div class="m-item" onclick="logout()"><div class="m-icon"><i data-lucide="log-out"></i></div><p style="font-size:11px; font-weight:600;">Keluar</p></div>
+            <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="qr-code"></i></div><p style="font-size:11px; font-weight:600;">Scan</p></div>
+            <div class="m-item" onclick="logout()"><div class="m-icon"><i data-lucide="power"></i></div><p style="font-size:11px; font-weight:600;">Keluar</p></div>
         </div>
     </div>
-
     <div class="s-card">
         <p style="font-size: 11px; color:#999; font-weight: 800;">TOTAL SALDO</p>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
@@ -168,9 +180,8 @@
             <button onclick="showMyQR()" style="background:var(--blue); color:#fff; border:none; padding:10px 20px; border-radius:15px; font-weight:800;">SCAN</button>
         </div>
     </div>
-
     <div class="history">
-        <h4 style="font-size:15px; font-weight:800; color:#222; margin-bottom:15px;">Riwayat Sultan</h4>
+        <h4 style="font-size:15px; font-weight:800; color:#222; margin-bottom:15px;">Riwayat</h4>
         <div id="hist-list"></div>
     </div>
 </div>
