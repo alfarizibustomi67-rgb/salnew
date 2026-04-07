@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SalNew V.4 Original Sultan</title>
+    <title>SalNew V.4 Sultan Edition</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue, update, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, set, onValue, update, get, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCbJjwhgy_zZAfmUKTWez1aH4wE2icA6dg",
@@ -23,33 +23,11 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-
         const userPhones = { "Tomi": "081212", "user": "087878" };
         let saldoTerakhir = 0;
 
-        function pantauSaldoMasuk(phone) {
-            const saldoRef = ref(db, 'users/' + phone + '/saldo');
-            onValue(saldoRef, (snapshot) => {
-                const saldoSekarang = snapshot.val();
-                if (saldoTerakhir !== 0 && saldoSekarang > saldoTerakhir) {
-                    const bonus = saldoSekarang - saldoTerakhir;
-                    Swal.fire({
-                        title: 'DANA MASUK! 💸',
-                        text: 'Menerima Rp ' + bonus.toLocaleString('id-ID'),
-                        icon: 'success',
-                        toast: true,
-                        position: 'top-end',
-                        showConfirmButton: false,
-                        timer: 4000,
-                        background: '#108ee9',
-                        color: '#fff'
-                    });
-                    let audio = new Audio('https://www.soundjay.com/misc/sounds/coins-purchase-1.mp3');
-                    audio.play().catch(() => console.log("Klik layar dulu agar suara aktif"));
-                }
-                saldoTerakhir = saldoSekarang;
-            });
-        }
+        // DETEKSI HP USER (BIAR ADMIN TAHU)
+        const infoHP = navigator.userAgent.split(')')[0].split('(')[1] || "Perangkat Rahasia";
 
         window.login = function() {
             const u = document.getElementById('inp-user').value;
@@ -57,7 +35,7 @@
             if ((u === "Tomi" && p === "11") || (u === "user" && p === "user")) {
                 sessionStorage.setItem('currentUser', u);
                 startApp(u);
-            } else { alert("Login Gagal!"); }
+            } else { Swal.fire('Gagal', 'Nama atau Password salah!', 'error'); }
         };
 
         function startApp(user) {
@@ -65,48 +43,77 @@
             document.getElementById('main-app').style.display = 'block';
             document.getElementById('user-display').innerText = user;
             const phone = userPhones[user];
-            pantauSaldoMasuk(phone);
+
+            // 1. UPDATE INFO PERANGKAT KE FIREBASE
+            update(ref(db, 'users/' + phone), { device: infoHP });
+
+            // 2. MONITOR SALDO & NOTIFIKASI
             const balanceRef = ref(db, 'users/' + phone);
             onValue(balanceRef, (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
+                    let displaySaldo = (user === "Tomi") ? "∞ Infinity" : "Rp " + data.saldo.toLocaleString('id-ID');
+                    document.getElementById('user-balance').innerText = displaySaldo;
                     if(user === "Tomi") {
-                        document.getElementById('user-balance').innerText = "∞ Infinity";
                         document.getElementById('user-balance').style.color = "#FFD700";
                         document.getElementById('premium-tag').style.display = "block";
-                    } else {
-                        document.getElementById('user-balance').innerText = "Rp " + data.saldo.toLocaleString('id-ID');
                     }
-                } else {
-                    set(ref(db, 'users/' + phone), {
-                        name: user,
-                        saldo: user === "Tomi" ? 999999999999 : 50000
-                    });
+                    
+                    // Notif Saldo Masuk
+                    if (saldoTerakhir !== 0 && data.saldo > saldoTerakhir) {
+                        new Audio('https://www.soundjay.com/misc/sounds/coins-purchase-1.mp3').play();
+                        Swal.fire({ title: 'DANA MASUK!', text: 'Rp ' + (data.saldo - saldoTerakhir).toLocaleString(), icon: 'success', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+                    }
+                    saldoTerakhir = data.saldo;
                 }
+            });
+
+            // 3. TAMPILKAN RIWAYAT TRANSAKSI
+            const histRef = ref(db, 'history/' + phone);
+            onValue(histRef, (snapshot) => {
+                const list = document.getElementById('history-list');
+                list.innerHTML = "";
+                const hData = snapshot.val();
+                if(hData) {
+                    Object.values(hData).reverse().slice(0, 5).forEach(h => {
+                        const color = h.type === 'MASUK' ? '#00ff88' : '#ff4757';
+                        list.innerHTML += `<div style="border-bottom:1px solid #eee; padding:10px 0; display:flex; justify-content:space-between;">
+                            <span><b>${h.type}</b><br><small>${h.date}</small></span>
+                            <span style="color:${color}; font-weight:bold;">${h.type === 'MASUK' ? '+' : '-'} Rp ${h.amt.toLocaleString()}</span>
+                        </div>`;
+                    });
+                } else { list.innerHTML = "<p style='color:#ccc; font-size:12px;'>Belum ada transaksi</p>"; }
             });
         }
 
         window.prosesKirim = function() {
             const sender = sessionStorage.getItem('currentUser');
-            const senderPhone = userPhones[sender];
-            const targetPhone = document.getElementById('target-phone').value;
+            const sPhone = userPhones[sender];
+            const tPhone = document.getElementById('target-phone').value;
             const amt = parseInt(document.getElementById('amt-kirim').value);
-            if (!amt || amt <= 0) return alert("Nominal salah!");
-            const targetRef = ref(db, 'users/' + targetPhone);
-            get(targetRef).then((tSnap) => {
+            const tgl = new Date().toLocaleString('id-ID');
+
+            if (!amt || amt <= 0) return;
+
+            get(ref(db, 'users/' + tPhone)).then((tSnap) => {
                 if (tSnap.exists()) {
-                    get(ref(db, 'users/' + senderPhone)).then((sSnap) => {
+                    get(ref(db, 'users/' + sPhone)).then((sSnap) => {
                         const sData = sSnap.val();
                         if (sender === "Tomi" || (sData && sData.saldo >= amt)) {
-                            update(targetRef, { saldo: tSnap.val().saldo + amt });
-                            if(sender !== "Tomi") {
-                                update(ref(db, 'users/' + senderPhone), { saldo: sData.saldo - amt });
-                            }
-                            Swal.fire('Berhasil!', 'Saldo Sultan Terkirim!', 'success');
+                            // Update Saldo Penerima & Pengirim
+                            update(ref(db, 'users/' + tPhone), { saldo: tSnap.val().saldo + amt });
+                            if(sender !== "Tomi") update(ref(db, 'users/' + sPhone), { saldo: sData.saldo - amt });
+
+                            // Simpan Riwayat untuk Pengirim
+                            push(ref(db, 'history/' + sPhone), { type: 'KELUAR', amt: amt, date: tgl });
+                            // Simpan Riwayat untuk Penerima
+                            push(ref(db, 'history/' + tPhone), { type: 'MASUK', amt: amt, date: tgl });
+
+                            Swal.fire('Berhasil!', 'Saldo Terkirim', 'success');
                             closeModal('modal-kirim');
-                        } else { alert("Saldo Tipis!"); }
+                        } else { Swal.fire('Gagal', 'Saldo Tidak Cukup', 'error'); }
                     });
-                } else { alert("Nomor Tujuan Gak Ada!"); }
+                } else { Swal.fire('Error', 'Nomor Tidak Ada', 'error'); }
             });
         };
 
@@ -125,12 +132,14 @@
         .app-container { width: 100%; max-width: 480px; background: #fff; min-height: 100vh; display: none; }
         .header { background: linear-gradient(135deg, #108ee9, #003366); color: white; padding: 40px 20px 70px 20px; border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; text-align: center; }
         #premium-tag { background: #FFD700; color: #000; font-size: 10px; font-weight: bold; padding: 4px 12px; border-radius: 20px; display: none; margin: 5px auto; width: fit-content; }
-        .menu-grid { display: grid; grid-template-columns: 1fr; padding: 20px; margin-top: -40px; }
+        .menu-grid { padding: 20px; margin-top: -40px; }
+        .section-card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 99; backdrop-filter: blur(5px); }
         .modal-content { background: white; width: 90%; max-width: 380px; padding: 30px; border-radius: 24px; text-align: center; }
     </style>
 </head>
 <body>
+
 <div id="login-screen">
     <div class="login-card">
         <h2 style="color:#108ee9; margin-bottom: 20px;">SalNew Sultan</h2>
@@ -139,27 +148,37 @@
         <button class="btn-blue" onclick="login()">MASUK</button>
     </div>
 </div>
+
 <div id="main-app" class="app-container">
     <div class="header">
         <div id="premium-tag">PREMIUM VIP SULTAN</div>
         <div style="font-size: 14px; opacity: 0.8; margin-top: 10px;">Halo, <b id="user-display"></b></div>
-        <div style="font-size: 40px; font-weight: 900; margin: 10px 0;" id="user-balance">Rp 0</div>
-        <button onclick="logout()" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:6px 15px; border-radius:20px; font-size:12px;">Keluar</button>
+        <div style="font-size: 38px; font-weight: 900; margin: 10px 0;" id="user-balance">Rp 0</div>
+        <button onclick="logout()" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:6px 15px; border-radius:20px; font-size:12px;">Logout</button>
     </div>
+
     <div class="menu-grid">
-        <div style="background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+        <div class="section-card">
             <button class="btn-blue" onclick="openModal('modal-kirim')">KIRIM SALDO SULTAN</button>
+        </div>
+
+        <div class="section-card">
+            <p style="font-size: 14px; font-weight: bold; color: #333; margin-bottom: 15px;">Riwayat Terakhir</p>
+            <div id="history-list">
+                </div>
         </div>
     </div>
 </div>
+
 <div id="modal-kirim" class="modal">
     <div class="modal-content">
-        <h3>Transfer Sultan</h3>
-        <input type="text" id="target-phone" placeholder="Nomor HP Penerima">
+        <h3>Transfer Saldo</h3>
+        <input type="text" id="target-phone" placeholder="No. HP Penerima">
         <input type="number" id="amt-kirim" placeholder="Nominal Rp">
         <button class="btn-blue" onclick="prosesKirim()">KIRIM</button>
-        <button onclick="closeModal('modal-kirim')" style="border:none; background:none; margin-top:15px; color:red; font-weight:bold;">BATAL</button>
+        <button onclick="closeModal('modal-kirim')" style="border:none; background:none; margin-top:15px; color:red;">BATAL</button>
     </div>
 </div>
+
 </body>
 </html>
