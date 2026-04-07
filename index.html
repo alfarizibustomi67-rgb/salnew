@@ -2,14 +2,18 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SalNew V.6 - Clean Elegant</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>SalNew V.8 Liquid</title>
+    
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue, update, get, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, onValue, get, update, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCbJjwhgy_zZAfmUKTWez1aH4wE2icA6dg",
@@ -23,150 +27,134 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-
-        // DATA USER (User dengan U Kapital)
         const userPhones = { "Tomi": "081212", "User": "087878" };
-        let saldoTerakhir = 0;
 
         window.login = function() {
             const u = document.getElementById('inp-user').value;
             const p = document.getElementById('inp-pass').value;
-            // Password User tetap 'user' atau sesuaikan kebutuhanmu
             if ((u === "Tomi" && p === "11") || (u === "User" && p === "user")) {
                 sessionStorage.setItem('currentUser', u);
                 startApp(u);
-            } else { 
-                Swal.fire({ icon: 'error', title: 'Gagal', text: 'Nama atau Password salah!' });
-            }
+            } else { Swal.fire('Gagal', 'Akses Ditolak', 'error'); }
         };
 
         function startApp(user) {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('main-app').style.display = 'block';
-            document.getElementById('user-display').innerText = user;
+            document.getElementById('u-name').innerText = user;
             const phone = userPhones[user];
 
-            const balanceRef = ref(db, 'users/' + phone);
-            onValue(balanceRef, (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    let val = (user === "Tomi") ? "∞ Infinity" : "Rp " + data.saldo.toLocaleString('id-ID');
-                    document.getElementById('user-balance').innerText = val;
-                    if(user === "Tomi") document.getElementById('premium-tag').style.display = "block";
-                    
-                    if (saldoTerakhir !== 0 && data.saldo > saldoTerakhir) {
-                        new Audio('https://www.soundjay.com/misc/sounds/coins-purchase-1.mp3').play().catch(()=>{});
-                        Swal.fire({ title: 'DANA MASUK!', icon: 'success', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
-                    }
-                    saldoTerakhir = data.saldo;
+            onValue(ref(db, 'users/' + phone), (snap) => {
+                const d = snap.val();
+                if (d) {
+                    const saldoText = (user === "Tomi") ? "∞ Infinity" : "Rp " + d.saldo.toLocaleString('id-ID');
+                    document.getElementById('u-balance').innerText = saldoText;
                 }
             });
         }
 
-        window.prosesKirim = async function() {
-            const sender = sessionStorage.getItem('currentUser');
-            const sPhone = userPhones[sender];
-            const tPhone = document.getElementById('target-phone').value;
-            const amt = parseInt(document.getElementById('amt-kirim').value);
-
-            if (!tPhone || !amt || amt <= 0) return Swal.fire('Error', 'Data tidak valid', 'error');
-
-            const tRef = ref(db, 'users/' + tPhone);
-            const sRef = ref(db, 'users/' + sPhone);
-
-            const tSnap = await get(tRef);
-            if (!tSnap.exists()) return Swal.fire('Gagal', 'Nomor tujuan tidak ada!', 'error');
-
-            const sSnap = await get(sRef);
-            const sData = sSnap.val();
-
-            if (sender === "Tomi" || (sData && sData.saldo >= amt)) {
-                // UPDATE SALDO TUJUAN
-                await update(tRef, { saldo: tSnap.val().saldo + amt });
-                // POTONG SALDO PENGIRIM (Jika bukan Tomi)
-                if(sender !== "Tomi") await update(sRef, { saldo: sData.saldo - amt });
-
-                // CATAT RIWAYAT
-                push(ref(db, 'history/' + sPhone), { type: 'KELUAR', amt: amt, date: new Date().toLocaleString() });
-                push(ref(db, 'history/' + tPhone), { type: 'MASUK', amt: amt, date: new Date().toLocaleString() });
-
-                Swal.fire('Berhasil!', 'Saldo Berhasil Terkirim', 'success');
-                closeModal('modal-kirim');
-            } else {
-                Swal.fire('Gagal', 'Saldo tidak mencukupi', 'error');
-            }
+        window.openAction = (name) => {
+            Swal.fire({ title: name, text: 'Fitur mirip DANA sedang diproses...', icon: 'info', confirmButtonColor: '#108ee9' });
         };
 
-        window.openModal = (id) => document.getElementById(id).style.display = 'flex';
-        window.closeModal = (id) => document.getElementById(id).style.display = 'none';
-        window.logout = () => { sessionStorage.clear(); location.reload(); };
         lucide.createIcons();
     </script>
 
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-        body { background: #f8fbff; display: flex; justify-content: center; min-height: 100vh; }
-        
-        /* LOGIN */
-        #login-screen { width: 100%; max-width: 400px; padding: 20px; display: flex; align-items: center; }
-        .login-card { background: white; padding: 40px 30px; border-radius: 30px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; }
-        input { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #eee; border-radius: 15px; background: #f9f9f9; outline: none; transition: 0.3s; }
-        input:focus { border-color: #108ee9; background: white; }
-        
-        /* MAIN APP */
-        .app-container { width: 100%; max-width: 480px; background: white; min-height: 100vh; display: none; position: relative; }
-        .header { background: #108ee9; color: white; padding: 60px 20px 80px 20px; text-align: center; border-radius: 0 0 40px 40px; }
-        .balance-card { background: white; margin: -50px 20px 20px 20px; padding: 30px; border-radius: 25px; box-shadow: 0 15px 45px rgba(0,0,0,0.06); text-align: center; }
-        
-        .btn-main { background: #108ee9; color: white; border: none; padding: 16px; border-radius: 18px; width: 100%; font-weight: bold; cursor: pointer; font-size: 16px; }
-        .btn-main:active { transform: scale(0.97); }
+        :root { --dana-blue: #108ee9; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: #f4f7fa; display: flex; justify-content: center; }
 
-        #premium-tag { background: #FFD700; color: #333; font-size: 10px; font-weight: bold; padding: 4px 12px; border-radius: 20px; width: fit-content; margin: 0 auto 10px auto; }
-        
-        /* MODAL */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: white; padding: 30px; border-radius: 30px; width: 90%; max-width: 380px; text-align: center; }
+        /* ANIMASI LIQUID BG */
+        .bg-liquid { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; filter: blur(50px) contrast(20); background: #fff; }
+        .blob { position: absolute; background: var(--dana-blue); border-radius: 50%; animation: move 20s infinite alternate; opacity: 0.6; }
+        @keyframes move { from { transform: translate(0,0) scale(1); } to { transform: translate(150px, 300px) scale(1.8); } }
+
+        .app-container { width: 100%; max-width: 480px; min-height: 100vh; background: rgba(255,255,255,0.8); backdrop-filter: blur(20px); display: none; overflow-x: hidden; }
+
+        /* HEADER DANA STYLE */
+        .header { background: var(--dana-blue); color: white; padding: 50px 20px 30px 20px; border-radius: 0 0 35px 35px; box-shadow: 0 10px 30px rgba(16, 142, 233, 0.2); }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+
+        /* DANA MAIN MENU (4 TOMBOL) */
+        .main-menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; }
+        .menu-item { cursor: pointer; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .menu-item:active { transform: scale(0.8); }
+        .menu-icon { background: rgba(255,255,255,0.2); padding: 12px; border-radius: 18px; display: inline-block; margin-bottom: 8px; }
+
+        /* CARD SALDO */
+        .balance-card { background: white; margin: -20px 20px 20px 20px; padding: 25px; border-radius: 25px; box-shadow: 0 15px 35px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(16, 142, 233, 0.1); }
+        .btn-pay { background: var(--dana-blue); color: white; padding: 12px 25px; border-radius: 50px; font-weight: bold; border: none; }
+
+        /* LOGIN SCREEN */
+        #login-screen { width: 100%; max-width: 480px; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 30px; }
+        .login-card { background: white; width: 100%; padding: 40px; border-radius: 40px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 18px; margin: 10px 0; border: none; background: #f0f7ff; border-radius: 20px; outline: none; font-size: 16px; }
+        .btn-login { width: 100%; padding: 18px; background: var(--dana-blue); color: white; border: none; border-radius: 20px; font-weight: bold; font-size: 16px; margin-top: 15px; box-shadow: 0 10px 20px rgba(16, 142, 233, 0.3); }
     </style>
 </head>
 <body>
 
+<div class="bg-liquid">
+    <div class="blob" style="width:250px; height:250px; top:5%; left:5%;"></div>
+    <div class="blob" style="width:200px; height:200px; bottom:10%; right:5%; animation-delay: -5s;"></div>
+</div>
+
 <div id="login-screen">
     <div class="login-card">
-        <h2 style="color: #108ee9; margin-bottom: 5px;">SalNew</h2>
-        <p style="font-size: 12px; color: #aaa; margin-bottom: 25px;">Simple & Secure</p>
+        <h1 style="color:var(--dana-blue); margin-bottom:10px;">SalNew</h1>
+        <p style="color:#aaa; font-size:12px; margin-bottom:30px;">Liquid Experience V.8</p>
         <input type="text" id="inp-user" placeholder="Nama Akun">
-        <input type="password" id="inp-pass" placeholder="Kata Sandi">
-        <button class="btn-main" onclick="login()">Masuk Sekarang</button>
+        <input type="password" id="inp-pass" placeholder="Password">
+        <button class="btn-login" onclick="login()">MASUK SULTAN</button>
     </div>
 </div>
 
 <div id="main-app" class="app-container">
     <div class="header">
-        <div id="premium-tag" style="display:none;">PREMIUM SULTAN</div>
-        <p style="opacity: 0.8; font-size: 14px;">Selamat Datang, <span id="user-display"></span></p>
+        <div class="top-bar">
+            <div>
+                <p style="font-size: 12px; opacity: 0.8;">Selamat Datang,</p>
+                <h3 id="u-name">Tomi</h3>
+            </div>
+            <i data-lucide="bell" style="width:22px;"></i>
+        </div>
+
+        <div class="main-menu">
+            <div class="menu-item" onclick="openAction('Pindai QR')">
+                <div class="menu-icon"><i data-lucide="scan-line"></i></div>
+                <p style="font-size: 11px;">Pindai</p>
+            </div>
+            <div class="menu-item" onclick="openAction('Top Up Saldo')">
+                <div class="menu-icon"><i data-lucide="plus-circle"></i></div>
+                <p style="font-size: 11px;">Isi Saldo</p>
+            </div>
+            <div class="menu-item" onclick="openAction('Kirim Uang')">
+                <div class="menu-icon"><i data-lucide="send"></i></div>
+                <p style="font-size: 11px;">Kirim</p>
+            </div>
+            <div class="menu-item" onclick="openAction('Minta Saldo')">
+                <div class="menu-icon"><i data-lucide="download"></i></div>
+                <p style="font-size: 11px;">Minta</p>
+            </div>
+        </div>
     </div>
 
     <div class="balance-card">
-        <p style="color: #999; font-size: 12px; margin-bottom: 5px;">Saldo Tersedia</p>
-        <h1 id="user-balance" style="font-size: 32px; color: #222; margin-bottom: 20px;">Rp 0</h1>
-        <button class="btn-main" onclick="openModal('modal-kirim')">
-            <i data-lucide="send" style="width: 18px; vertical-align: middle; margin-right: 5px;"></i> Kirim Dana
-        </button>
+        <div>
+            <p style="font-size: 11px; color:#888;">Saldo SalNew</p>
+            <h2 id="u-balance" style="color:#222; margin-top:5px;">Rp 0</h2>
+        </div>
+        <button class="btn-pay" onclick="openAction('Bayar')">BAYAR</button>
     </div>
 
-    <div style="padding: 0 20px;">
-        <button onclick="logout()" style="width: 100%; padding: 12px; background: #fff1f1; color: #ff4757; border: none; border-radius: 15px; font-weight: bold; cursor: pointer;">Keluar Akun</button>
+    <div style="padding: 20px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; text-align: center;">
+        <div onclick="location.href='shop.html'" style="cursor:pointer;"><i data-lucide="smartphone" style="color:#108ee9;"></i><p style="font-size:10px; margin-top:5px;">Beli HP</p></div>
+        <div><i data-lucide="zap" style="color:orange;"></i><p style="font-size:10px; margin-top:5px;">Listrik</p></div>
+        <div><i data-lucide="tv" style="color:red;"></i><p style="font-size:10px; margin-top:5px;">Cicilan</p></div>
+        <div><i data-lucide="more-horizontal"></i><p style="font-size:10px; margin-top:5px;">Lainnya</p></div>
     </div>
-</div>
 
-<div id="modal-kirim" class="modal">
-    <div class="modal-content">
-        <h3 style="margin-bottom: 20px;">Kirim Saldo Sultan</h3>
-        <input type="text" id="target-phone" placeholder="Nomor HP Tujuan">
-        <input type="number" id="amt-kirim" placeholder="Jumlah (Rp)">
-        <button class="btn-main" onclick="prosesKirim()">Kirim Sekarang</button>
-        <button onclick="closeModal('modal-kirim')" style="margin-top: 15px; border: none; background: none; color: #aaa; font-weight: bold;">Batal</button>
-    </div>
 </div>
 
 <script>lucide.createIcons();</script>
