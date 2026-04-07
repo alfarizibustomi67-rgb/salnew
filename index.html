@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>SalNew V.20 Sultan</title>
+    <title>SalNew V.100 OMNI</title>
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -34,9 +34,12 @@
             const u = document.getElementById('inp-user').value;
             const p = document.getElementById('inp-pass').value;
             if ((u === "Tomi" && p === "11") || (u === "User" && p === "user")) {
-                sessionStorage.setItem('currentUser', u);
-                startApp(u);
-            } else { Swal.fire('Gagal', 'Akses Sultan Ditolak', 'error'); }
+                document.getElementById('login-screen').classList.add('fade-out');
+                setTimeout(() => {
+                    sessionStorage.setItem('currentUser', u);
+                    startApp(u);
+                }, 500);
+            } else { Swal.fire('Error', 'Sultan Only!', 'error'); }
         };
 
         function startApp(user) {
@@ -45,35 +48,30 @@
             document.getElementById('u-name').innerText = user;
             const phone = userPhones[user];
 
-            // Realtime Saldo
             onValue(ref(db, 'users/' + phone), (snap) => {
                 const data = snap.val();
                 if (data) {
                     currentBalance = data.saldo;
                     document.getElementById('u-balance').innerText = (user === "Tomi") ? "∞ Infinity" : "Rp " + data.saldo.toLocaleString('id-ID');
-                    if(user === "Tomi") document.getElementById('vip-badge').style.display = 'inline-block';
                 }
             });
 
-            // Realtime History (Riwayat)
-            const historyRef = query(ref(db, 'history/' + phone), limitToLast(5));
-            onValue(historyRef, (snap) => {
-                const list = document.getElementById('history-list');
+            // History Loader
+            const histRef = query(ref(db, 'history/' + phone), limitToLast(10));
+            onValue(histRef, (snap) => {
+                const list = document.getElementById('hist-list');
                 list.innerHTML = "";
                 snap.forEach((child) => {
                     const item = child.val();
-                    const color = item.type === "MASUK" ? "#2ecc71" : "#e74c3c";
-                    const icon = item.type === "MASUK" ? "arrow-down-left" : "arrow-up-right";
+                    const isMasuk = item.type === "MASUK";
                     list.innerHTML = `
-                        <div class="hist-item">
-                            <div class="hist-icon" style="background:${color}22; color:${color}">
-                                <i data-lucide="${icon}" style="width:16px;"></i>
-                            </div>
+                        <div class="h-card">
+                            <div class="h-icon ${isMasuk ? 'in' : 'out'}"><i data-lucide="${isMasuk ? 'arrow-down-left' : 'arrow-up-right'}"></i></div>
                             <div style="flex:1; margin-left:15px;">
-                                <p style="font-weight:bold; font-size:13px;">${item.type} SALDO</p>
-                                <p style="font-size:10px; color:#999;">${item.date}</p>
+                                <p style="font-weight:700; font-size:14px;">${isMasuk ? 'Saldo Masuk' : 'Saldo Keluar'}</p>
+                                <p style="font-size:10px; color:#aaa;">${item.date}</p>
                             </div>
-                            <p style="font-weight:bold; color:${color}">${item.type === "MASUK" ? "+" : "-"} Rp ${item.amt.toLocaleString()}</p>
+                            <p style="font-weight:800; color:${isMasuk ? '#2ecc71' : '#e74c3c'}">${isMasuk ? '+' : '-'} Rp ${item.amt.toLocaleString()}</p>
                         </div>
                     ` + list.innerHTML;
                 });
@@ -81,129 +79,109 @@
             });
         }
 
-        window.prosesTransfer = async function() {
-            const { value: pin } = await Swal.fire({
-                title: 'Masukkan PIN 6 Digit',
-                input: 'password',
-                inputPlaceholder: '******',
-                inputAttributes: { maxlength: 6, autofocus: 'autofocus' }
-            });
+        window.actionKirim = async () => {
+            const { value: target } = await Swal.fire({ title: 'Kirim Ke Nomor', input: 'text', confirmButtonColor: '#108ee9' });
+            if (!target) return;
+            const { value: amt } = await Swal.fire({ title: 'Jumlah Saldo', input: 'number', confirmButtonColor: '#108ee9' });
+            if (amt > 0) {
+                const sender = sessionStorage.getItem('currentUser');
+                const tRef = ref(db, 'users/' + target);
+                const tSnap = await get(tRef);
+                if (tSnap.exists()) {
+                    const amount = parseInt(amt);
+                    if (sender === "Tomi" || currentBalance >= amount) {
+                        await update(tRef, { saldo: tSnap.val().saldo + amount });
+                        if(sender !== "Tomi") await update(ref(db, 'users/' + userPhones[sender]), { saldo: currentBalance - amount });
+                        const date = new Date().toLocaleString();
+                        push(ref(db, 'history/' + userPhones[sender]), { type: 'KELUAR', amt: amount, date });
+                        push(ref(db, 'history/' + target), { type: 'MASUK', amt: amount, date });
+                        Swal.fire('Berhasil!', 'Saldo Terkirim Cepat', 'success');
+                    } else { Swal.fire('Gagal', 'Saldo Tipis Boss', 'warning'); }
+                } else { Swal.fire('Gagal', 'Nomor Tidak Ada', 'error'); }
+            }
+        };
 
-            if (pin === "112233" || sessionStorage.getItem('currentUser') === "Tomi") {
-                const { value: target } = await Swal.fire({ title: 'Nomor Tujuan', input: 'text', inputPlaceholder: '08...' });
-                const { value: amt } = await Swal.fire({ title: 'Jumlah Rp', input: 'number' });
-                
-                if (target && amt > 0) {
-                    const sender = sessionStorage.getItem('currentUser');
-                    const sPhone = userPhones[sender];
-                    const tRef = ref(db, 'users/' + target);
-                    const tSnap = await get(tRef);
-
-                    if (tSnap.exists()) {
-                        const amount = parseInt(amt);
-                        if (sender === "Tomi" || currentBalance >= amount) {
-                            await update(tRef, { saldo: tSnap.val().saldo + amount });
-                            if(sender !== "Tomi") await update(ref(db, 'users/' + sPhone), { saldo: currentBalance - amount });
-                            
-                            // Catat Riwayat
-                            const now = new Date().toLocaleString();
-                            push(ref(db, 'history/' + sPhone), { type: 'KELUAR', amt: amount, date: now });
-                            push(ref(db, 'history/' + target), { type: 'MASUK', amt: amount, date: now });
-                            
-                            Swal.fire('Sukses!', 'Saldo Terkirim', 'success');
-                        } else { Swal.fire('Gagal', 'Saldo tidak cukup', 'error'); }
-                    } else { Swal.fire('Error', 'Nomor tidak terdaftar', 'error'); }
-                }
-            } else { Swal.fire('Salah', 'PIN Keamanan Salah!', 'error'); }
-        }
-
-        window.logout = () => { sessionStorage.clear(); location.reload(); };
+        window.logout = () => { location.reload(); };
         lucide.createIcons();
     </script>
 
     <style>
-        :root { --dana-blue: #108ee9; }
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background: #f8faff; display: flex; justify-content: center; }
+        :root { --main: #108ee9; --bg: #f4f8fb; }
+        * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); display: flex; justify-content: center; }
 
-        .app-container { width: 100%; max-width: 480px; min-height: 100vh; background: white; display: none; }
+        .app { width: 100%; max-width: 480px; min-height: 100vh; background: white; display: none; overflow-x: hidden; position: relative; }
+        
+        /* DYNAMIC ISLAND */
+        .island { width: 120px; height: 35px; background: black; margin: 10px auto; border-radius: 20px; transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: fixed; left: 50%; transform: translateX(-50%); z-index: 999; }
+        .island:hover { width: 200px; height: 60px; }
 
-        /* HEADER V.20 */
-        .header { background: var(--dana-blue); color: white; padding: 60px 20px 40px 20px; border-radius: 0 0 45px 45px; text-align: center; }
-        .main-menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 30px; }
-        .menu-item { cursor: pointer; transition: 0.2s; }
-        .menu-item:active { transform: scale(0.8); }
-        .menu-icon { background: rgba(255,255,255,0.15); padding: 14px; border-radius: 22px; display: inline-block; margin-bottom: 8px; backdrop-filter: blur(10px); }
+        .header { background: var(--main); color: white; padding: 70px 25px 50px 25px; border-radius: 0 0 50px 50px; box-shadow: 0 15px 40px rgba(16,142,233,0.3); }
+        .grid-menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 30px; }
+        .m-item { text-align: center; cursor: pointer; transition: 0.3s; }
+        .m-item:active { transform: scale(0.8); }
+        .m-icon { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 22px; display: inline-block; backdrop-filter: blur(10px); margin-bottom: 8px; }
 
-        /* CARD SALDO */
-        .card-sultan { background: white; margin: -30px 20px 20px 20px; padding: 25px; border-radius: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; border: 1px solid #f0f0f0; }
+        .s-card { background: white; margin: -40px 25px 25px 25px; padding: 30px; border-radius: 35px; box-shadow: 0 20px 50px rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; border: 1px solid #f0f0f0; }
 
-        /* HISTORY LIST */
-        .history-section { padding: 0 20px 100px 20px; }
-        .hist-item { display: flex; align-items: center; padding: 15px; background: #fafafa; border-radius: 20px; margin-bottom: 10px; transition: 0.3s; }
-        .hist-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        .history { padding: 0 25px 100px 25px; }
+        .h-card { display: flex; align-items: center; padding: 18px; background: #fff; border-radius: 25px; margin-bottom: 12px; border: 1px solid #f7f7f7; box-shadow: 0 5px 15px rgba(0,0,0,0.02); }
+        .h-icon { width: 45px; height: 45px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
+        .h-icon.in { background: #e8f8f0; color: #2ecc71; }
+        .h-icon.out { background: #fdf2f2; color: #e74c3c; }
 
-        #vip-badge { background: linear-gradient(45deg, #ffd700, #ffae00); color: #fff; font-size: 9px; padding: 3px 8px; border-radius: 10px; margin-left: 5px; display: none; vertical-align: middle; box-shadow: 0 4px 10px rgba(255, 174, 0, 0.4); }
+        #login-screen { width: 100%; max-width: 480px; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px; background: #fff; }
+        .l-box { width: 100%; text-align: center; }
+        input { width: 100%; padding: 20px; margin: 12px 0; border: none; background: #f0f5fa; border-radius: 25px; font-weight: 600; outline: none; transition: 0.3s; }
+        input:focus { background: #e1ecf7; box-shadow: 0 0 0 2px var(--main); }
+        .btn { width: 100%; padding: 20px; background: var(--main); color: white; border: none; border-radius: 25px; font-weight: 800; font-size: 16px; box-shadow: 0 15px 30px rgba(16,142,233,0.3); }
 
-        /* LOGIN */
-        #login-screen { width: 100%; max-width: 480px; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 30px; }
-        .login-box { width: 100%; text-align: center; background: white; padding: 40px; border-radius: 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.1); }
-        input { width: 100%; padding: 18px; margin: 10px 0; border: none; background: #f4f8fb; border-radius: 20px; outline: none; font-weight: 500; }
-        .btn-sultan { width: 100%; padding: 18px; background: var(--dana-blue); color: white; border: none; border-radius: 20px; font-weight: bold; font-size: 16px; box-shadow: 0 10px 20px rgba(16, 142, 233, 0.2); }
+        .fade-out { opacity: 0; transform: scale(0.9); transition: 0.5s; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
-    <div class="login-box">
-        <h1 style="color:var(--dana-blue); letter-spacing: -1px;">SalNew V.20</h1>
-        <p style="color:#bbb; font-size: 13px; margin-bottom: 30px;">Premium Ecosystem</p>
+    <div class="l-box">
+        <div style="font-size: 60px; margin-bottom: 20px;">🪙</div>
+        <h1 style="color:var(--main); font-size:32px; letter-spacing:-1.5px;">SalNew OMNI</h1>
+        <p style="color:#aaa; font-size:12px; margin-bottom:40px;">Version 100.0 (Ultimate Mentok)</p>
         <input type="text" id="inp-user" placeholder="Username Sultan">
-        <input type="password" id="inp-pass" placeholder="Password">
-        <button class="btn-sultan" onclick="login()">MASUK SEKARANG</button>
+        <input type="password" id="inp-pass" placeholder="Password PIN">
+        <button class="btn" onclick="login()">Buka Akses</button>
     </div>
 </div>
 
-<div id="main-app" class="app-container">
+<div id="main-app" class="app">
+    <div class="island"></div>
     <div class="header">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h3><span id="u-name"></span> <span id="vip-badge">VIP GOLD</span></h3>
-            <div onclick="logout()"><i data-lucide="log-out" style="width:20px; opacity:0.7;"></i></div>
+            <h3>Sultan <span id="u-name"></span></h3>
+            <i data-lucide="bell" style="width:20px; opacity:0.8;"></i>
         </div>
-
-        <div class="main-menu">
-            <div class="menu-item" onclick="prosesTransfer()">
-                <div class="menu-icon"><i data-lucide="send"></i></div>
-                <p style="font-size: 11px; font-weight: 600;">Kirim</p>
-            </div>
-            <div class="menu-item" onclick="location.href='shop.html'">
-                <div class="menu-icon"><i data-lucide="shopping-cart"></i></div>
-                <p style="font-size: 11px; font-weight: 600;">Beli HP</p>
-            </div>
-            <div class="menu-item" onclick="Swal.fire('Top Up','Hubungi Admin Tomi untuk Isi Saldo!','info')">
-                <div class="menu-icon"><i data-lucide="plus-square"></i></div>
-                <p style="font-size: 11px; font-weight: 600;">Isi Saldo</p>
-            </div>
-            <div class="menu-item" onclick="Swal.fire('Fitur QR','Kamera Scanner segera hadir!','info')">
-                <div class="menu-icon"><i data-lucide="qr-code"></i></div>
-                <p style="font-size: 11px; font-weight: 600;">Pindai</p>
-            </div>
+        <div class="grid-menu">
+            <div class="m-item" onclick="actionKirim()"><div class="m-icon"><i data-lucide="send"></i></div><p style="font-size:10px;font-weight:700;">Kirim</p></div>
+            <div class="m-item" onclick="location.href='shop.html'"><div class="m-icon"><i data-lucide="smartphone"></i></div><p style="font-size:10px;font-weight:700;">Beli HP</p></div>
+            <div class="m-item" onclick="Swal.fire('Top Up','Hubungi Admin Tomi!','info')"><div class="m-icon"><i data-lucide="plus-circle"></i></div><p style="font-size:10px;font-weight:700;">Isi Saldo</p></div>
+            <div class="m-item" onclick="logout()"><div class="m-icon"><i data-lucide="power"></i></div><p style="font-size:10px;font-weight:700;">Keluar</p></div>
         </div>
     </div>
 
-    <div class="card-sultan">
+    <div class="s-card">
         <div>
-            <p style="font-size: 10px; color:#aaa; font-weight: bold; letter-spacing: 1px;">TOTAL SALDO</p>
-            <h2 id="u-balance" style="font-size: 28px; color:#222; margin-top: 5px;">Rp 0</h2>
+            <p style="font-size: 9px; color:#bbb; font-weight:900; letter-spacing:1px;">LIMIT SALDO SULTAN</p>
+            <h2 id="u-balance" style="font-size:30px; margin-top:5px; color:#222;">Rp 0</h2>
         </div>
-        <button style="background:var(--dana-blue); color:white; border:none; padding:10px 20px; border-radius:15px; font-weight:bold; font-size:12px;">BAYAR</button>
+        <div style="background:#108ee915; padding:12px; border-radius:50%; color:var(--main);"><i data-lucide="wallet"></i></div>
     </div>
 
-    <div class="history-section">
-        <h4 style="margin-bottom: 15px; color:#333; font-size: 14px;">Riwayat Transaksi</h4>
-        <div id="history-list">
-            <p style="text-align:center; color:#ccc; font-size:12px; margin-top:20px;">Belum ada transaksi</p>
+    <div class="history">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h4 style="color:#333;">Riwayat Transaksi</h4>
+            <p style="font-size:11px; color:var(--main); font-weight:700;">Lihat Semua</p>
         </div>
+        <div id="hist-list">
+            </div>
     </div>
 </div>
 
