@@ -6,14 +6,14 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>SalNew V.9 Functional</title>
+    <title>SalNew V.20 Sultan</title>
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, onValue, get, update, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, onValue, get, update, push, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCbJjwhgy_zZAfmUKTWez1aH4wE2icA6dg",
@@ -30,89 +30,92 @@
         const userPhones = { "Tomi": "081212", "User": "087878" };
         let currentBalance = 0;
 
-        // --- FUNGSI LOGIN ---
         window.login = function() {
             const u = document.getElementById('inp-user').value;
             const p = document.getElementById('inp-pass').value;
             if ((u === "Tomi" && p === "11") || (u === "User" && p === "user")) {
                 sessionStorage.setItem('currentUser', u);
                 startApp(u);
-            } else { 
-                Swal.fire({ icon: 'error', title: 'Gagal', text: 'Nama atau Password salah!' });
-            }
+            } else { Swal.fire('Gagal', 'Akses Sultan Ditolak', 'error'); }
         };
 
-        // --- MULAI APLIKASI ---
         function startApp(user) {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('main-app').style.display = 'block';
             document.getElementById('u-name').innerText = user;
             const phone = userPhones[user];
 
+            // Realtime Saldo
             onValue(ref(db, 'users/' + phone), (snap) => {
                 const data = snap.val();
                 if (data) {
                     currentBalance = data.saldo;
                     document.getElementById('u-balance').innerText = (user === "Tomi") ? "∞ Infinity" : "Rp " + data.saldo.toLocaleString('id-ID');
+                    if(user === "Tomi") document.getElementById('vip-badge').style.display = 'inline-block';
                 }
+            });
+
+            // Realtime History (Riwayat)
+            const historyRef = query(ref(db, 'history/' + phone), limitToLast(5));
+            onValue(historyRef, (snap) => {
+                const list = document.getElementById('history-list');
+                list.innerHTML = "";
+                snap.forEach((child) => {
+                    const item = child.val();
+                    const color = item.type === "MASUK" ? "#2ecc71" : "#e74c3c";
+                    const icon = item.type === "MASUK" ? "arrow-down-left" : "arrow-up-right";
+                    list.innerHTML = `
+                        <div class="hist-item">
+                            <div class="hist-icon" style="background:${color}22; color:${color}">
+                                <i data-lucide="${icon}" style="width:16px;"></i>
+                            </div>
+                            <div style="flex:1; margin-left:15px;">
+                                <p style="font-weight:bold; font-size:13px;">${item.type} SALDO</p>
+                                <p style="font-size:10px; color:#999;">${item.date}</p>
+                            </div>
+                            <p style="font-weight:bold; color:${color}">${item.type === "MASUK" ? "+" : "-"} Rp ${item.amt.toLocaleString()}</p>
+                        </div>
+                    ` + list.innerHTML;
+                });
+                lucide.createIcons();
             });
         }
 
-        // --- FUNGSI KIRIM (FUNCTIONAL) ---
-        window.bukaKirim = async function() {
-            const { value: formValues } = await Swal.fire({
-                title: 'Kirim Saldo Sultan',
-                html:
-                    '<input id="swal-input1" class="swal2-input" placeholder="Nomor HP Tujuan">' +
-                    '<input id="swal-input2" type="number" class="swal2-input" placeholder="Jumlah Rp">',
-                focusConfirm: false,
-                confirmButtonText: 'KIRIM SEKARANG',
-                confirmButtonColor: '#108ee9',
-                preConfirm: () => {
-                    return [
-                        document.getElementById('swal-input1').value,
-                        document.getElementById('swal-input2').value
-                    ]
-                }
+        window.prosesTransfer = async function() {
+            const { value: pin } = await Swal.fire({
+                title: 'Masukkan PIN 6 Digit',
+                input: 'password',
+                inputPlaceholder: '******',
+                inputAttributes: { maxlength: 6, autofocus: 'autofocus' }
             });
 
-            if (formValues) {
-                const [targetPhone, amount] = formValues;
-                const amt = parseInt(amount);
-                const sender = sessionStorage.getItem('currentUser');
-                const sPhone = userPhones[sender];
+            if (pin === "112233" || sessionStorage.getItem('currentUser') === "Tomi") {
+                const { value: target } = await Swal.fire({ title: 'Nomor Tujuan', input: 'text', inputPlaceholder: '08...' });
+                const { value: amt } = await Swal.fire({ title: 'Jumlah Rp', input: 'number' });
+                
+                if (target && amt > 0) {
+                    const sender = sessionStorage.getItem('currentUser');
+                    const sPhone = userPhones[sender];
+                    const tRef = ref(db, 'users/' + target);
+                    const tSnap = await get(tRef);
 
-                if (!targetPhone || isNaN(amt) || amt <= 0) return Swal.fire('Error', 'Data tidak valid', 'error');
-
-                const tRef = ref(db, 'users/' + targetPhone);
-                const tSnap = await get(tRef);
-
-                if (!tSnap.exists()) return Swal.fire('Gagal', 'Nomor tujuan tidak terdaftar!', 'error');
-
-                if (sender === "Tomi" || currentBalance >= amt) {
-                    // Update saldo tujuan
-                    await update(tRef, { saldo: tSnap.val().saldo + amt });
-                    // Potong saldo pengirim (jika bukan Tomi)
-                    if (sender !== "Tomi") {
-                        await update(ref(db, 'users/' + sPhone), { saldo: currentBalance - amt });
-                    }
-                    
-                    Swal.fire('Berhasil!', `Rp ${amt.toLocaleString()} terkirim ke ${targetPhone}`, 'success');
-                } else {
-                    Swal.fire('Gagal', 'Saldo tidak cukup!', 'error');
+                    if (tSnap.exists()) {
+                        const amount = parseInt(amt);
+                        if (sender === "Tomi" || currentBalance >= amount) {
+                            await update(tRef, { saldo: tSnap.val().saldo + amount });
+                            if(sender !== "Tomi") await update(ref(db, 'users/' + sPhone), { saldo: currentBalance - amount });
+                            
+                            // Catat Riwayat
+                            const now = new Date().toLocaleString();
+                            push(ref(db, 'history/' + sPhone), { type: 'KELUAR', amt: amount, date: now });
+                            push(ref(db, 'history/' + target), { type: 'MASUK', amt: amount, date: now });
+                            
+                            Swal.fire('Sukses!', 'Saldo Terkirim', 'success');
+                        } else { Swal.fire('Gagal', 'Saldo tidak cukup', 'error'); }
+                    } else { Swal.fire('Error', 'Nomor tidak terdaftar', 'error'); }
                 }
-            }
-        };
-
-        // --- FUNGSI TOP UP (DANA STYLE) ---
-        window.bukaTopUp = () => {
-            Swal.fire({
-                title: 'Top Up SalNew',
-                text: 'Silakan hubungi Admin Tomi untuk menambah saldo Sultan kamu!',
-                icon: 'info',
-                confirmButtonColor: '#108ee9'
-            });
-        };
+            } else { Swal.fire('Salah', 'PIN Keamanan Salah!', 'error'); }
+        }
 
         window.logout = () => { sessionStorage.clear(); location.reload(); };
         lucide.createIcons();
@@ -121,88 +124,86 @@
     <style>
         :root { --dana-blue: #108ee9; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background: #f4f7fa; display: flex; justify-content: center; }
+        body { background: #f8faff; display: flex; justify-content: center; }
 
-        .bg-liquid { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; filter: blur(50px) contrast(20); background: #fff; }
-        .blob { position: absolute; background: var(--dana-blue); border-radius: 50%; animation: move 20s infinite alternate; opacity: 0.6; }
-        @keyframes move { from { transform: translate(0,0) scale(1); } to { transform: translate(150px, 300px) scale(1.8); } }
+        .app-container { width: 100%; max-width: 480px; min-height: 100vh; background: white; display: none; }
 
-        .app-container { width: 100%; max-width: 480px; min-height: 100vh; background: rgba(255,255,255,0.8); backdrop-filter: blur(20px); display: none; }
-
-        /* HEADER DANA */
-        .header { background: var(--dana-blue); color: white; padding: 60px 20px 40px 20px; border-radius: 0 0 40px 40px; }
-        .main-menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-top: 25px; }
+        /* HEADER V.20 */
+        .header { background: var(--dana-blue); color: white; padding: 60px 20px 40px 20px; border-radius: 0 0 45px 45px; text-align: center; }
+        .main-menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 30px; }
         .menu-item { cursor: pointer; transition: 0.2s; }
-        .menu-item:active { transform: scale(0.85); }
-        .menu-icon { background: rgba(255,255,255,0.2); padding: 12px; border-radius: 20px; display: inline-block; margin-bottom: 8px; }
+        .menu-item:active { transform: scale(0.8); }
+        .menu-icon { background: rgba(255,255,255,0.15); padding: 14px; border-radius: 22px; display: inline-block; margin-bottom: 8px; backdrop-filter: blur(10px); }
 
-        /* KARTU SALDO */
-        .balance-card { background: white; margin: -25px 20px 20px 20px; padding: 25px; border-radius: 25px; box-shadow: 0 15px 35px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; }
-        
-        .btn-pay { background: var(--dana-blue); color: white; padding: 12px 25px; border-radius: 50px; font-weight: bold; border: none; cursor: pointer; }
-        .btn-pay:active { transform: scale(0.9); }
+        /* CARD SALDO */
+        .card-sultan { background: white; margin: -30px 20px 20px 20px; padding: 25px; border-radius: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; border: 1px solid #f0f0f0; }
+
+        /* HISTORY LIST */
+        .history-section { padding: 0 20px 100px 20px; }
+        .hist-item { display: flex; align-items: center; padding: 15px; background: #fafafa; border-radius: 20px; margin-bottom: 10px; transition: 0.3s; }
+        .hist-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+
+        #vip-badge { background: linear-gradient(45deg, #ffd700, #ffae00); color: #fff; font-size: 9px; padding: 3px 8px; border-radius: 10px; margin-left: 5px; display: none; vertical-align: middle; box-shadow: 0 4px 10px rgba(255, 174, 0, 0.4); }
 
         /* LOGIN */
         #login-screen { width: 100%; max-width: 480px; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 30px; }
-        .login-card { background: white; width: 100%; padding: 40px; border-radius: 40px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.1); }
-        input { width: 100%; padding: 18px; margin: 10px 0; border: none; background: #f0f7ff; border-radius: 20px; outline: none; }
-        .btn-login { width: 100%; padding: 18px; background: var(--dana-blue); color: white; border: none; border-radius: 20px; font-weight: bold; margin-top: 15px; }
+        .login-box { width: 100%; text-align: center; background: white; padding: 40px; border-radius: 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 18px; margin: 10px 0; border: none; background: #f4f8fb; border-radius: 20px; outline: none; font-weight: 500; }
+        .btn-sultan { width: 100%; padding: 18px; background: var(--dana-blue); color: white; border: none; border-radius: 20px; font-weight: bold; font-size: 16px; box-shadow: 0 10px 20px rgba(16, 142, 233, 0.2); }
     </style>
 </head>
 <body>
 
-<div class="bg-liquid">
-    <div class="blob" style="width:250px; height:250px; top:5%; left:5%;"></div>
-    <div class="blob" style="width:200px; height:200px; bottom:10%; right:5%;"></div>
-</div>
-
 <div id="login-screen">
-    <div class="login-card">
-        <h1 style="color:var(--dana-blue);">SalNew</h1>
-        <p style="color:#aaa; font-size:12px; margin-bottom:30px;">Liquid & Functional V.9</p>
-        <input type="text" id="inp-user" placeholder="Nama Akun">
+    <div class="login-box">
+        <h1 style="color:var(--dana-blue); letter-spacing: -1px;">SalNew V.20</h1>
+        <p style="color:#bbb; font-size: 13px; margin-bottom: 30px;">Premium Ecosystem</p>
+        <input type="text" id="inp-user" placeholder="Username Sultan">
         <input type="password" id="inp-pass" placeholder="Password">
-        <button class="btn-login" onclick="login()">MASUK</button>
+        <button class="btn-sultan" onclick="login()">MASUK SEKARANG</button>
     </div>
 </div>
 
 <div id="main-app" class="app-container">
     <div class="header">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h3>Halo, <span id="u-name"></span></h3>
-            <i data-lucide="bell"></i>
+            <h3><span id="u-name"></span> <span id="vip-badge">VIP GOLD</span></h3>
+            <div onclick="logout()"><i data-lucide="log-out" style="width:20px; opacity:0.7;"></i></div>
         </div>
 
         <div class="main-menu">
-            <div class="menu-item" onclick="Swal.fire('Fitur Scan','Kamera Pindai Segera Hadir!','info')">
-                <div class="menu-icon"><i data-lucide="scan-line"></i></div>
-                <p style="font-size: 11px;">Pindai</p>
-            </div>
-            <div class="menu-item" onclick="bukaTopUp()">
-                <div class="menu-icon"><i data-lucide="plus-circle"></i></div>
-                <p style="font-size: 11px;">Isi Saldo</p>
-            </div>
-            <div class="menu-item" onclick="bukaKirim()">
+            <div class="menu-item" onclick="prosesTransfer()">
                 <div class="menu-icon"><i data-lucide="send"></i></div>
-                <p style="font-size: 11px;">Kirim</p>
+                <p style="font-size: 11px; font-weight: 600;">Kirim</p>
             </div>
-            <div class="menu-item" onclick="Swal.fire('Minta Saldo','Tunjukkan QR ini ke teman!','success')">
-                <div class="menu-icon"><i data-lucide="download"></i></div>
-                <p style="font-size: 11px;">Minta</p>
+            <div class="menu-item" onclick="location.href='shop.html'">
+                <div class="menu-icon"><i data-lucide="shopping-cart"></i></div>
+                <p style="font-size: 11px; font-weight: 600;">Beli HP</p>
+            </div>
+            <div class="menu-item" onclick="Swal.fire('Top Up','Hubungi Admin Tomi untuk Isi Saldo!','info')">
+                <div class="menu-icon"><i data-lucide="plus-square"></i></div>
+                <p style="font-size: 11px; font-weight: 600;">Isi Saldo</p>
+            </div>
+            <div class="menu-item" onclick="Swal.fire('Fitur QR','Kamera Scanner segera hadir!','info')">
+                <div class="menu-icon"><i data-lucide="qr-code"></i></div>
+                <p style="font-size: 11px; font-weight: 600;">Pindai</p>
             </div>
         </div>
     </div>
 
-    <div class="balance-card">
+    <div class="card-sultan">
         <div>
-            <p style="font-size: 11px; color:#888;">Saldo SalNew</p>
-            <h2 id="u-balance">Rp 0</h2>
+            <p style="font-size: 10px; color:#aaa; font-weight: bold; letter-spacing: 1px;">TOTAL SALDO</p>
+            <h2 id="u-balance" style="font-size: 28px; color:#222; margin-top: 5px;">Rp 0</h2>
         </div>
-        <button class="btn-pay" onclick="location.href='shop.html'">BELI HP</button>
+        <button style="background:var(--dana-blue); color:white; border:none; padding:10px 20px; border-radius:15px; font-weight:bold; font-size:12px;">BAYAR</button>
     </div>
 
-    <div style="padding: 20px; text-align: center;">
-        <button onclick="logout()" style="background:none; border:none; color:#ff4757; font-weight:bold; cursor:pointer;">Keluar Akun</button>
+    <div class="history-section">
+        <h4 style="margin-bottom: 15px; color:#333; font-size: 14px;">Riwayat Transaksi</h4>
+        <div id="history-list">
+            <p style="text-align:center; color:#ccc; font-size:12px; margin-top:20px;">Belum ada transaksi</p>
+        </div>
     </div>
 </div>
 
