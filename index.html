@@ -2,22 +2,14 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="display" content="standalone">
-    <meta name="theme-color" content="#108ee9">
-
-    <title>SalNew Sultan</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalNew V.6 - Clean Elegant</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, set, onValue, update, get, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCbJjwhgy_zZAfmUKTWez1aH4wE2icA6dg",
@@ -32,53 +24,151 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
+        // DATA USER (User dengan U Kapital)
+        const userPhones = { "Tomi": "081212", "User": "087878" };
+        let saldoTerakhir = 0;
+
         window.login = function() {
             const u = document.getElementById('inp-user').value;
             const p = document.getElementById('inp-pass').value;
+            // Password User tetap 'user' atau sesuaikan kebutuhanmu
             if ((u === "Tomi" && p === "11") || (u === "User" && p === "user")) {
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('main-app').style.display = 'block';
-                document.getElementById('user-display').innerText = u;
+                sessionStorage.setItem('currentUser', u);
+                startApp(u);
             } else { 
-                Swal.fire('Gagal', 'Nama/Password Salah', 'error'); 
+                Swal.fire({ icon: 'error', title: 'Gagal', text: 'Nama atau Password salah!' });
             }
         };
+
+        function startApp(user) {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('user-display').innerText = user;
+            const phone = userPhones[user];
+
+            const balanceRef = ref(db, 'users/' + phone);
+            onValue(balanceRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    let val = (user === "Tomi") ? "∞ Infinity" : "Rp " + data.saldo.toLocaleString('id-ID');
+                    document.getElementById('user-balance').innerText = val;
+                    if(user === "Tomi") document.getElementById('premium-tag').style.display = "block";
+                    
+                    if (saldoTerakhir !== 0 && data.saldo > saldoTerakhir) {
+                        new Audio('https://www.soundjay.com/misc/sounds/coins-purchase-1.mp3').play().catch(()=>{});
+                        Swal.fire({ title: 'DANA MASUK!', icon: 'success', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+                    }
+                    saldoTerakhir = data.saldo;
+                }
+            });
+        }
+
+        window.prosesKirim = async function() {
+            const sender = sessionStorage.getItem('currentUser');
+            const sPhone = userPhones[sender];
+            const tPhone = document.getElementById('target-phone').value;
+            const amt = parseInt(document.getElementById('amt-kirim').value);
+
+            if (!tPhone || !amt || amt <= 0) return Swal.fire('Error', 'Data tidak valid', 'error');
+
+            const tRef = ref(db, 'users/' + tPhone);
+            const sRef = ref(db, 'users/' + sPhone);
+
+            const tSnap = await get(tRef);
+            if (!tSnap.exists()) return Swal.fire('Gagal', 'Nomor tujuan tidak ada!', 'error');
+
+            const sSnap = await get(sRef);
+            const sData = sSnap.val();
+
+            if (sender === "Tomi" || (sData && sData.saldo >= amt)) {
+                // UPDATE SALDO TUJUAN
+                await update(tRef, { saldo: tSnap.val().saldo + amt });
+                // POTONG SALDO PENGIRIM (Jika bukan Tomi)
+                if(sender !== "Tomi") await update(sRef, { saldo: sData.saldo - amt });
+
+                // CATAT RIWAYAT
+                push(ref(db, 'history/' + sPhone), { type: 'KELUAR', amt: amt, date: new Date().toLocaleString() });
+                push(ref(db, 'history/' + tPhone), { type: 'MASUK', amt: amt, date: new Date().toLocaleString() });
+
+                Swal.fire('Berhasil!', 'Saldo Berhasil Terkirim', 'success');
+                closeModal('modal-kirim');
+            } else {
+                Swal.fire('Gagal', 'Saldo tidak mencukupi', 'error');
+            }
+        };
+
+        window.openModal = (id) => document.getElementById(id).style.display = 'flex';
+        window.closeModal = (id) => document.getElementById(id).style.display = 'none';
+        window.logout = () => { sessionStorage.clear(); location.reload(); };
         lucide.createIcons();
     </script>
 
     <style>
-        /* CSS BIAR FULL LAYAR KE ATAS */
-        body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            overflow: hidden; background: #fff; font-family: sans-serif;
-        }
-        #login-screen {
-            width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center;
-        }
-        .login-box { text-align: center; width: 85%; }
-        input { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #ddd; border-radius: 15px; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; background: #108ee9; color: #fff; border: none; border-radius: 15px; font-weight: bold; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background: #f8fbff; display: flex; justify-content: center; min-height: 100vh; }
         
-        /* SEMBUNYIKAN SCROLL */
-        ::-webkit-scrollbar { display: none; }
+        /* LOGIN */
+        #login-screen { width: 100%; max-width: 400px; padding: 20px; display: flex; align-items: center; }
+        .login-card { background: white; padding: 40px 30px; border-radius: 30px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; }
+        input { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #eee; border-radius: 15px; background: #f9f9f9; outline: none; transition: 0.3s; }
+        input:focus { border-color: #108ee9; background: white; }
+        
+        /* MAIN APP */
+        .app-container { width: 100%; max-width: 480px; background: white; min-height: 100vh; display: none; position: relative; }
+        .header { background: #108ee9; color: white; padding: 60px 20px 80px 20px; text-align: center; border-radius: 0 0 40px 40px; }
+        .balance-card { background: white; margin: -50px 20px 20px 20px; padding: 30px; border-radius: 25px; box-shadow: 0 15px 45px rgba(0,0,0,0.06); text-align: center; }
+        
+        .btn-main { background: #108ee9; color: white; border: none; padding: 16px; border-radius: 18px; width: 100%; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .btn-main:active { transform: scale(0.97); }
+
+        #premium-tag { background: #FFD700; color: #333; font-size: 10px; font-weight: bold; padding: 4px 12px; border-radius: 20px; width: fit-content; margin: 0 auto 10px auto; }
+        
+        /* MODAL */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 30px; border-radius: 30px; width: 90%; max-width: 380px; text-align: center; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
-    <div class="login-box">
-        <h1 style="color:#108ee9;">SalNew Sultan</h1>
-        <p style="color:#aaa; font-size:12px;">Full Screen Edition</p>
-        <input type="text" id="inp-user" placeholder="Username">
-        <input type="password" id="inp-pass" placeholder="Password">
-        <button onclick="login()">LOGIN SULTAN</button>
+    <div class="login-card">
+        <h2 style="color: #108ee9; margin-bottom: 5px;">SalNew</h2>
+        <p style="font-size: 12px; color: #aaa; margin-bottom: 25px;">Simple & Secure</p>
+        <input type="text" id="inp-user" placeholder="Nama Akun">
+        <input type="password" id="inp-pass" placeholder="Kata Sandi">
+        <button class="btn-main" onclick="login()">Masuk Sekarang</button>
     </div>
 </div>
 
-<div id="main-app" style="display:none; padding:20px; text-align:center;">
-    <h2>Halo, <span id="user-display"></span></h2>
-    <p>Sekarang sudah Full Screen!</p>
+<div id="main-app" class="app-container">
+    <div class="header">
+        <div id="premium-tag" style="display:none;">PREMIUM SULTAN</div>
+        <p style="opacity: 0.8; font-size: 14px;">Selamat Datang, <span id="user-display"></span></p>
+    </div>
+
+    <div class="balance-card">
+        <p style="color: #999; font-size: 12px; margin-bottom: 5px;">Saldo Tersedia</p>
+        <h1 id="user-balance" style="font-size: 32px; color: #222; margin-bottom: 20px;">Rp 0</h1>
+        <button class="btn-main" onclick="openModal('modal-kirim')">
+            <i data-lucide="send" style="width: 18px; vertical-align: middle; margin-right: 5px;"></i> Kirim Dana
+        </button>
+    </div>
+
+    <div style="padding: 0 20px;">
+        <button onclick="logout()" style="width: 100%; padding: 12px; background: #fff1f1; color: #ff4757; border: none; border-radius: 15px; font-weight: bold; cursor: pointer;">Keluar Akun</button>
+    </div>
 </div>
 
+<div id="modal-kirim" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-bottom: 20px;">Kirim Saldo Sultan</h3>
+        <input type="text" id="target-phone" placeholder="Nomor HP Tujuan">
+        <input type="number" id="amt-kirim" placeholder="Jumlah (Rp)">
+        <button class="btn-main" onclick="prosesKirim()">Kirim Sekarang</button>
+        <button onclick="closeModal('modal-kirim')" style="margin-top: 15px; border: none; background: none; color: #aaa; font-weight: bold;">Batal</button>
+    </div>
+</div>
+
+<script>lucide.createIcons();</script>
 </body>
 </html>
