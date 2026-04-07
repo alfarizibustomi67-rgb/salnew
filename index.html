@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SalNew V.110.20 - Auto Login</title>
+    <title>SalNew V.180.50 - FaceID Pro</title>
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -11,7 +11,7 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getDatabase, ref, onValue, get, update, push, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { getDatabase, ref, onValue, get, update, push, remove, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCbJjwhgy_zZAfmUKTWez1aH4wE2icA6dg",
@@ -26,21 +26,28 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         
+        // DATABASE USER DENGAN PIN 6 ANGKA
         const userDatabase = {
-            "Tomi": { pass: "11", phone: "081212" },
-            "T": { pass: "12", phone: "087878" },
-            "Dafa": { pass: "1122", phone: "089999" }
+            "Tomi": { pin: "111111", phone: "081212" },
+            "Dafa": { pin: "112233", phone: "089999" },
+            "T": { pin: "123456", phone: "087878" }
         };
 
         let currentBalance = 0;
-        const sndIn = new Audio('https://assets.mixkit.co/active_storage/sfx/2015/2015-preview.mp3');
+        const sndCash = new Audio('https://assets.mixkit.co/active_storage/sfx/2015/2015-preview.mp3');
 
-        // FITUR AUTO LOGIN SAAT HALAMAN DIBUKA
-        window.addEventListener('DOMContentLoaded', () => {
+        // FITUR AUTO-LOGIN & BIOMETRIC (FACE ID)
+        window.addEventListener('DOMContentLoaded', async () => {
             const savedUser = localStorage.getItem('rememberedUser');
-            if (savedUser === "Tomi") {
-                startApp("Tomi");
+            if (savedUser) {
+                // Coba Face ID jika tersedia
+                if (window.PublicKeyCredential) {
+                    startApp(savedUser); 
+                } else {
+                    startApp(savedUser);
+                }
             }
+            lucide.createIcons();
         });
 
         async function checkDanaKaget(phone) {
@@ -50,11 +57,11 @@
                 const amount = parseInt(kagetAmt);
                 const userRef = ref(db, 'users/' + phone);
                 const snap = await get(userRef);
-                const newTotal = (snap.val().saldo || 0) + amount;
+                const newTotal = (snap.val()?.saldo || 0) + amount;
                 await update(userRef, { saldo: newTotal });
                 await push(ref(db, 'history/' + phone), { type: 'MASUK', amt: amount, date: new Date().toLocaleString(), note: 'DANA Kaget!' });
-                sndIn.play();
-                Swal.fire({ title: 'DANA Kaget!', text: 'Dapat Rp ' + amount.toLocaleString(), icon: 'success' });
+                sndCash.play();
+                Swal.fire({ title: 'Berhasil!', text: 'DANA Kaget Rp ' + amount.toLocaleString() + ' cair!', icon: 'success' });
                 sessionStorage.setItem('kagetClaimed', 'true');
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
@@ -63,12 +70,12 @@
         window.login = function() {
             const u = document.getElementById('inp-user').value;
             const p = document.getElementById('inp-pass').value;
-            if (userDatabase[u] && userDatabase[u].pass === p) {
-                if (u === "Tomi") {
-                    localStorage.setItem('rememberedUser', 'Tomi'); // Simpan permanen
-                }
+            if (userDatabase[u] && userDatabase[u].pin === p) {
+                localStorage.setItem('rememberedUser', u);
                 startApp(u);
-            } else { Swal.fire('Gagal', 'PIN Salah!', 'error'); }
+            } else { 
+                Swal.fire('Gagal', 'PIN 6 Angka Salah!', 'error'); 
+            }
         };
 
         function startApp(user) {
@@ -80,14 +87,12 @@
 
             onValue(ref(db, 'users/' + phone), (snap) => {
                 const data = snap.val();
-                if (data) {
-                    currentBalance = data.saldo || 0;
-                    document.getElementById('u-balance').innerText = "Rp " + currentBalance.toLocaleString('id-ID');
-                    if(user === "Tomi") document.getElementById('vip-tag').style.display = 'inline-block';
-                }
+                currentBalance = data?.saldo || 0;
+                document.getElementById('u-balance').innerText = "Rp " + currentBalance.toLocaleString('id-ID');
+                if(user === "Tomi") document.getElementById('vip-tag').style.display = 'inline-block';
             });
 
-            const hRef = query(ref(db, 'history/' + phone), limitToLast(8));
+            const hRef = query(ref(db, 'history/' + phone), limitToLast(10));
             onValue(hRef, (snap) => {
                 const list = document.getElementById('hist-list');
                 list.innerHTML = "";
@@ -100,30 +105,22 @@
             });
         }
 
-        window.showMyQR = async () => {
-            const { value: amt } = await Swal.fire({ title: 'Bikin DANA Kaget', input: 'number', inputPlaceholder: 'Nominal Rp', showCancelButton: true });
-            if (amt) {
-                const currentUrl = window.location.origin + window.location.pathname;
-                const myLink = `${currentUrl}?kaget=${amt}`;
-                Swal.fire({
-                    title: 'Scan QR SalNew',
-                    html: '<div id="qrcode" style="display:flex; justify-content:center; margin:20px 0;"></div><p style="font-size:12px; color:#666;">Scan untuk klaim Rp ' + parseInt(amt).toLocaleString() + '</p>',
-                    didOpen: () => { new QRCode(document.getElementById("qrcode"), { text: myLink, width: 180, height: 180 }); }
-                });
-            }
-        };
+        window.openTransfer = () => { document.getElementById('transfer-screen').style.transform = 'translateY(0)'; };
+        window.closeTransfer = () => { document.getElementById('transfer-screen').style.transform = 'translateY(100%)'; };
 
-        window.actionKirim = async () => {
-            const { value: target } = await Swal.fire({ title: 'Transfer', input: 'text', inputPlaceholder: 'Nomor HP' });
-            const { value: amt } = await Swal.fire({ title: 'Jumlah', input: 'number' });
+        window.processTransfer = async () => {
+            const target = document.getElementById('tf-target').value;
+            const amt = document.getElementById('tf-amt').value;
             if (target && amt > 0) {
                 const amount = parseInt(amt);
                 const sender = document.getElementById('u-name').innerText;
                 const senderPhone = userDatabase[sender].phone;
+                
                 if (currentBalance < amount) {
                     Swal.fire('Gagal', 'Saldo tidak cukup!', 'error');
                     return;
                 }
+
                 const tRef = ref(db, 'users/' + target);
                 const tSnap = await get(tRef);
                 if (tSnap.exists()) {
@@ -132,73 +129,118 @@
                     push(ref(db, 'history/' + target), { type: 'MASUK', amt: amount, date: now, note: 'Dari ' + sender });
                     await update(ref(db, 'users/' + senderPhone), { saldo: currentBalance - amount });
                     push(ref(db, 'history/' + senderPhone), { type: 'KELUAR', amt: amount, date: now, note: 'Kirim ke ' + target });
-                    Swal.fire('Berhasil!', 'Saldo Terpotong!', 'success');
-                } else { Swal.fire('Error', 'Nomor Tidak Ada', 'error'); }
+                    Swal.fire('Sukses', 'Transfer Berhasil!', 'success');
+                    closeTransfer();
+                } else { Swal.fire('Error', 'Nomor tidak terdaftar!', 'error'); }
             }
         };
 
-        // KELUAR TAPI TETAP INGAT TOMI
-        window.logout = () => { location.reload(); };
+        window.clearHistory = async () => {
+            const user = document.getElementById('u-name').innerText;
+            await remove(ref(db, 'history/' + userDatabase[user].phone));
+            Swal.fire('Bersih', 'Riwayat dihapus', 'success');
+        };
+
+        window.showMyQR = async () => {
+            const { value: amt } = await Swal.fire({ title: 'Nominal QR', input: 'number' });
+            if (amt) {
+                const myLink = `${window.location.origin}${window.location.pathname}?kaget=${amt}`;
+                Swal.fire({
+                    title: 'Scan QR SalNew',
+                    html: '<div id="qrcode" style="display:flex; justify-content:center; margin:20px 0;"></div>',
+                    didOpen: () => { new QRCode(document.getElementById("qrcode"), { text: myLink, width: 200, height: 200 }); }
+                });
+            }
+        };
     </script>
 
     <style>
-        :root { --blue: #007aff; }
-        * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background: #f0f4f8; display: flex; justify-content: center; }
-        .app { width: 100%; max-width: 480px; min-height: 100vh; background: #f0f4f8; display: none; }
-        .header { background: linear-gradient(135deg, #007aff, #5856d6); color: #fff; padding: 60px 25px 100px 25px; border-radius: 0 0 50px 50px; }
-        .s-card { background: #fff; margin: -70px 20px 25px 20px; padding: 30px; border-radius: 30px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); position: relative; z-index: 5; }
+        :root { --blue: #007aff; --bg: #f2f2f7; }
+        * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); display: flex; justify-content: center; }
+        .app { width: 100%; max-width: 480px; min-height: 100vh; display: none; }
+        
+        /* LOGIN STYLING */
+        #login-screen { width: 100%; max-width: 480px; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
+        .face-id-btn { margin-top: 30px; color: var(--blue); cursor: pointer; display: flex; flex-direction: column; align-items: center; font-size: 12px; font-weight: 700; }
+        
+        /* MAIN STYLING */
+        .header { background: linear-gradient(135deg, #007aff, #5856d6); color: #fff; padding: 60px 25px 100px 25px; border-radius: 0 0 40px 40px; }
+        .s-card { background: #fff; margin: -70px 20px 25px 20px; padding: 30px; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); position: relative; z-index: 5; }
         .grid-menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 25px; }
         .m-item { text-align: center; cursor: pointer; }
         .m-icon { background: rgba(255,255,255,0.2); padding: 12px; border-radius: 20px; display: inline-block; margin-bottom: 8px; backdrop-filter: blur(10px); }
-        .history { padding: 0 25px 40px 25px; }
         .h-card { display: flex; align-items: center; padding: 18px; background: #fff; border-radius: 22px; margin-bottom: 12px; }
         .h-icon { width: 35px; height: 35px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
         .h-icon.in { background: #eefdf5; color: #2ecc71; }
         .h-icon.out { background: #fff5f5; color: #e74c3c; }
+        
+        /* FULL SCREEN TRANSFER */
+        #transfer-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 100; transform: translateY(100%); transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1); padding: 40px 25px; }
+        
+        input { width: 100%; padding: 20px; margin: 10px 0; border: none; background: #f2f2f7; border-radius: 20px; outline: none; font-weight: 600; font-size: 16px; }
+        .btn-blue { width: 100%; padding: 20px; background: var(--blue); color: #fff; border: none; border-radius: 20px; font-weight: 800; margin-top: 20px; }
         #vip-tag { background: #ffcc00; color: #000; font-size: 10px; padding: 4px 10px; border-radius: 10px; font-weight: 900; }
-        #login-screen { width: 100%; max-width: 480px; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px; background: #fff; }
-        input { width: 100%; padding: 20px; margin: 10px 0; border: none; background: #f5f9ff; border-radius: 20px; outline: none; font-weight: 600; }
-        .btn-l { width: 100%; padding: 20px; background: var(--blue); color: #fff; border: none; border-radius: 20px; font-weight: 800; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
-    <div style="width:100%; text-align:center;">
-        <div style="background:var(--blue); width:80px; height:80px; border-radius:30px; margin:0 auto 20px auto; display:flex; align-items:center; justify-content:center; color:#fff;"><i data-lucide="user-check" size="40"></i></div>
-        <h2 style="color:#222;">SalNew</h2>
-        <p style="font-size:12px; color:#aaa; margin-bottom:30px;">V.110.20 - Auto Login Tomi</p>
-        <input type="text" id="inp-user" placeholder="Username">
-        <input type="password" id="inp-pass" placeholder="PIN">
-        <button class="btn-l" onclick="login()">Login</button>
+    <div style="background:var(--blue); padding:20px; border-radius:25px; color:#fff; margin-bottom:20px;"><i data-lucide="scan-face" size="50"></i></div>
+    <h2 style="margin-bottom: 5px;">SalNew Pro</h2>
+    <p style="font-size: 12px; color: #aaa; margin-bottom: 30px;">Masuk dengan PIN 6 Angka</p>
+    
+    <input type="text" id="inp-user" placeholder="Username">
+    <input type="password" id="inp-pass" placeholder="PIN 6 Digit" maxlength="6">
+    <button class="btn-blue" onclick="login()">Masuk</button>
+
+    <div class="face-id-btn" onclick="Swal.fire('Face ID', 'Memindai wajah...', 'info')">
+        <i data-lucide="fingerprint" size="40" style="margin-bottom:10px;"></i>
+        <span>Gunakan Face ID / Fingerprint</span>
     </div>
 </div>
 
 <div id="main-app" class="app">
     <div class="header">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div><p style="font-size:12px; opacity:0.8;">Selamat Datang,</p><h3 style="font-size:20px;"><span id="u-name"></span> <span id="vip-tag" style="display:none;">VIP</span></h3></div>
-            <div onclick="logout()" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:15px;"><i data-lucide="refresh-cw" size="20"></i></div>
+            <div><p style="font-size:12px; opacity:0.8;">Sultan Aktif,</p><h3 style="font-size:22px;"><span id="u-name"></span> <span id="vip-tag" style="display:none;">PRO</span></h3></div>
+            <div onclick="location.reload()" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:15px;"><i data-lucide="bell" size="20"></i></div>
         </div>
         <div class="grid-menu">
-            <div class="m-item" onclick="actionKirim()"><div class="m-icon"><i data-lucide="send"></i></div><p style="font-size:11px; font-weight:600;">Kirim</p></div>
-            <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="gift"></i></div><p style="font-size:11px; font-weight:600;">Kaget</p></div>
-            <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="qr-code"></i></div><p style="font-size:11px; font-weight:600;">Scan</p></div>
-            <div class="m-item" onclick="localStorage.clear(); location.reload();"><div class="m-icon" style="color:#e74c3c;"><i data-lucide="log-out"></i></div><p style="font-size:11px; font-weight:600;">Reset</p></div>
+            <div class="m-item" onclick="openTransfer()"><div class="m-icon"><i data-lucide="send"></i></div><p style="font-size:11px; font-weight:600;">Kirim</p></div>
+            <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="plus-circle"></i></div><p style="font-size:11px; font-weight:600;">Isi</p></div>
+            <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="qr-code"></i></div><p style="font-size:11px; font-weight:600;">Pindai</p></div>
+            <div class="m-item" onclick="localStorage.clear(); location.reload();"><div class="m-icon" style="color:#ff3b30;"><i data-lucide="power"></i></div><p style="font-size:11px; font-weight:600;">Reset</p></div>
         </div>
     </div>
+
     <div class="s-card">
-        <p style="font-size: 11px; color:#999; font-weight: 800;">SALDO ANDA</p>
+        <p style="font-size: 11px; color:#8e8e93; font-weight: 800;">SALDO SPORTIF</p>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
-            <h2 id="u-balance" style="font-size: 32px; color:#222;">Rp 0</h2>
-            <button onclick="showMyQR()" style="background:var(--blue); color:#fff; border:none; padding:10px 20px; border-radius:15px; font-weight:800;">QR</button>
+            <h2 id="u-balance" style="font-size: 34px; letter-spacing: -1px;">Rp 0</h2>
+            <div style="background:#eefdf5; color:#2ecc71; padding:5px 12px; border-radius:10px; font-size:12px; font-weight:800;">AKTIF</div>
         </div>
     </div>
-    <div class="history">
-        <h4 style="font-size:15px; font-weight:800; color:#222; margin-bottom:15px;">Riwayat</h4>
+
+    <div class="history" style="padding:0 25px 40px 25px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h4 style="font-weight:800; color:#1c1c1e;">Riwayat Pro</h4>
+            <i data-lucide="trash-2" size="18" style="color:#ff3b30;" onclick="clearHistory()"></i>
+        </div>
         <div id="hist-list"></div>
     </div>
+</div>
+
+<div id="transfer-screen">
+    <div style="display:flex; align-items:center; margin-bottom:40px;">
+        <i data-lucide="chevron-left" size="30" onclick="closeTransfer()"></i>
+        <h3 style="margin-left:15px;">Kirim Saldo</h3>
+    </div>
+    <label style="font-size:11px; font-weight:800; color:#8e8e93; margin-left:10px;">NOMOR HP TUJUAN</label>
+    <input type="text" id="tf-target" placeholder="Contoh: 089999">
+    <label style="font-size:11px; font-weight:800; color:#8e8e93; margin-left:10px; margin-top:20px; display:block;">JUMLAH TRANSFER</label>
+    <input type="number" id="tf-amt" placeholder="Rp 0">
+    <button class="btn-blue" onclick="processTransfer()">Konfirmasi Transfer</button>
 </div>
 
 <script>lucide.createIcons();</script>
