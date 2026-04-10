@@ -26,7 +26,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         
-        // UPDATE USER: Dafa dihapus, diganti PW
         const userDatabase = {
             "Tomi": { pin: "111111", phone: "081212" },
             "PW": { pin: "121212", phone: "085555" },
@@ -35,24 +34,21 @@
 
         let currentBalance = 0;
         let touchStartY = 0;
-        let touchEndY = 0;
 
-        // GESTURE SWIPE (Masih ada sebagai fitur rahasia kamu)
+        // FITUR STEALTH SWIPE V.200.20
         window.addEventListener('touchstart', e => { touchStartY = e.changedTouches[0].screenY; });
         window.addEventListener('touchend', e => { 
-            touchEndY = e.changedTouches[0].screenY;
+            const touchEndY = e.changedTouches[0].screenY;
             const distance = touchStartY - touchEndY;
+            
+            // Swipe Up (Bawah ke Atas) -> Stealth Login Tomi
             if (distance > 150 && document.getElementById('login-screen').style.display !== 'none') {
                 startApp('Tomi');
             }
+            // Swipe Down (Atas ke Bawah) -> Instant Logout
             if (distance < -150 && document.getElementById('main-app').style.display !== 'none') {
                 location.reload();
             }
-        });
-
-        // AUTO-LOGIN DIHAPUS (Halaman akan selalu buka di layar login)
-        window.addEventListener('DOMContentLoaded', () => {
-            lucide.createIcons();
         });
 
         window.login = function() {
@@ -61,7 +57,7 @@
             if (userDatabase[u] && userDatabase[u].pin === p) {
                 startApp(u);
             } else { 
-                Swal.fire({ icon: 'error', title: 'Gagal', text: 'PIN Salah!' });
+                Swal.fire({ icon: 'error', title: 'Gagal', text: 'Akses Ditolak', confirmButtonColor: '#007aff' });
             }
         };
 
@@ -71,11 +67,13 @@
             document.getElementById('u-name').innerText = user;
             const phone = userDatabase[user].phone;
 
+            // Sync Saldo Real-time (Anti-Delay)
             onValue(ref(db, 'users/' + phone), (snap) => {
                 currentBalance = snap.val()?.saldo || 0;
                 document.getElementById('u-balance').innerText = "Rp " + currentBalance.toLocaleString('id-ID');
             });
 
+            // Sync History (Limit 10)
             const hRef = query(ref(db, 'history/' + phone), limitToLast(10));
             onValue(hRef, (snap) => {
                 const list = document.getElementById('hist-list');
@@ -83,7 +81,15 @@
                 snap.forEach((child) => {
                     const item = child.val();
                     const isIn = item.type === "MASUK";
-                    list.innerHTML = `<div class="h-card"><div class="h-icon ${isIn ? 'in' : 'out'}"><i data-lucide="${isIn ? 'arrow-down-left' : 'arrow-up-right'}"></i></div><div style="flex:1; margin-left:15px;"><p style="font-weight:700; font-size:13px;">${item.note || 'Transaksi'}</p><p style="font-size:10px; color:#999;">${item.date}</p></div><p style="font-weight:800; color:${isIn ? '#2ecc71' : '#e74c3c'}">${isIn ? '+' : '-'} Rp ${item.amt.toLocaleString()}</p></div>` + list.innerHTML;
+                    list.innerHTML = `
+                        <div class="h-card">
+                            <div class="h-icon ${isIn ? 'in' : 'out'}"><i data-lucide="${isIn ? 'arrow-down-left' : 'arrow-up-right'}"></i></div>
+                            <div style="flex:1; margin-left:15px;">
+                                <p style="font-weight:700; font-size:13px;">${item.note || 'Transaksi'}</p>
+                                <p style="font-size:10px; color:#999;">${item.date}</p>
+                            </div>
+                            <p style="font-weight:800; color:${isIn ? '#2ecc71' : '#e74c3c'}">${isIn ? '+' : '-'} Rp ${item.amt.toLocaleString()}</p>
+                        </div>` + list.innerHTML;
                 });
                 lucide.createIcons();
             });
@@ -99,7 +105,7 @@
                 const amount = parseInt(amt);
                 const sender = document.getElementById('u-name').innerText;
                 const senderPhone = userDatabase[sender].phone;
-                if (currentBalance < amount) { return Swal.fire('Gagal', 'Saldo tidak cukup', 'error'); }
+                if (currentBalance < amount) return Swal.fire('Gagal', 'Saldo tidak cukup', 'error');
                 
                 const tRef = ref(db, 'users/' + target);
                 const tSnap = await get(tRef);
@@ -109,52 +115,63 @@
                     push(ref(db, 'history/' + target), { type: 'MASUK', amt: amount, date: now, note: 'Dari ' + sender });
                     await update(ref(db, 'users/' + senderPhone), { saldo: currentBalance - amount });
                     push(ref(db, 'history/' + senderPhone), { type: 'KELUAR', amt: amount, date: now, note: 'Ke ' + target });
-                    Swal.fire('Berhasil', 'Transfer Sukses', 'success');
+                    Swal.fire('Berhasil', 'Transfer Terkirim', 'success');
                     closeTransfer();
-                } else { Swal.fire('Error', 'Nomor tidak ditemukan', 'error'); }
+                } else { Swal.fire('Error', 'Nomor tidak terdaftar', 'error'); }
             }
         };
 
         window.clearHistory = async () => {
             const user = document.getElementById('u-name').innerText;
             await remove(ref(db, 'history/' + userDatabase[user].phone));
-            Swal.fire('Bersih', 'Riwayat dihapus', 'success');
+            Swal.fire('Selesai', 'Riwayat telah dibersihkan', 'success');
         };
 
         window.showMyQR = async () => {
-            const { value: amt } = await Swal.fire({ title: 'Jumlah', input: 'number' });
+            const { value: amt } = await Swal.fire({ title: 'Input Nominal', input: 'number', inputAttributes: { min: 1 } });
             if (amt) {
                 const myLink = `${window.location.origin}${window.location.pathname}?kaget=${amt}`;
-                Swal.fire({ title: 'SalNew QR', html: '<div id="qrcode" style="display:flex; justify-content:center; margin:20px 0;"></div>', didOpen: () => { new QRCode(document.getElementById("qrcode"), { text: myLink, width: 200, height: 200 }); } });
+                Swal.fire({
+                    title: 'SalNew QR',
+                    html: '<div id="qrcode" style="display:flex; justify-content:center; margin:20px 0;"></div>',
+                    didOpen: () => { new QRCode(document.getElementById("qrcode"), { text: myLink, width: 200, height: 200 }); }
+                });
             }
         };
+
+        window.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
     </script>
 
     <style>
         :root { --blue: #007aff; --bg: #f2f2f7; }
         * { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background: var(--bg); display: flex; justify-content: center; overflow: hidden; height: 100vh; }
-        .app { width: 100%; max-width: 480px; min-height: 100vh; display: none; }
+        .app { width: 100%; max-width: 480px; min-height: 100vh; display: none; overflow-y: auto; }
+        
         #login-screen { width: 100%; max-width: 480px; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
         .header { background: linear-gradient(135deg, #007aff, #5856d6); color: #fff; padding: 60px 25px 100px 25px; border-radius: 0 0 40px 40px; }
         .s-card { background: #fff; margin: -70px 20px 25px 20px; padding: 30px; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); position: relative; z-index: 5; }
+        
         .grid-menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 25px; }
         .m-item { text-align: center; cursor: pointer; }
         .m-icon { background: rgba(255,255,255,0.2); padding: 12px; border-radius: 20px; display: inline-block; margin-bottom: 8px; backdrop-filter: blur(10px); }
-        .h-card { display: flex; align-items: center; padding: 18px; background: #fff; border-radius: 22px; margin-bottom: 12px; }
+        
+        .h-card { display: flex; align-items: center; padding: 18px; background: #fff; border-radius: 22px; margin-bottom: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
         .h-icon { width: 35px; height: 35px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
         .h-icon.in { background: #eefdf5; color: #2ecc71; }
         .h-icon.out { background: #fff5f5; color: #e74c3c; }
-        #transfer-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 100; transform: translateY(100%); transition: 0.5s ease; padding: 40px 25px; }
+        
+        #transfer-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 100; transform: translateY(100%); transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); padding: 40px 25px; }
         input { width: 100%; padding: 20px; margin: 10px 0; border: none; background: #f2f2f7; border-radius: 20px; outline: none; font-weight: 600; font-size: 16px; }
-        .btn-blue { width: 100%; padding: 20px; background: var(--blue); color: #fff; border: none; border-radius: 20px; font-weight: 800; margin-top: 20px; }
+        .btn-blue { width: 100%; padding: 20px; background: var(--blue); color: #fff; border: none; border-radius: 20px; font-weight: 800; margin-top: 20px; box-shadow: 0 5px 15px rgba(0,122,255,0.3); }
+        .btn-blue:active { transform: scale(0.98); }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
     <div style="background:var(--blue); padding:20px; border-radius:25px; color:#fff; margin-bottom:20px;"><i data-lucide="shield-check" size="50"></i></div>
-    <h2 style="margin-bottom: 30px;">SalNew</h2>
+    <h2 style="margin-bottom: 30px; letter-spacing: -1px; font-weight: 800;">SalNew</h2>
     <input type="text" id="inp-user" placeholder="Username">
     <input type="password" id="inp-pass" placeholder="PIN" maxlength="6">
     <button class="btn-blue" onclick="login()">Masuk</button>
@@ -163,7 +180,7 @@
 <div id="main-app" class="app">
     <div class="header">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div><p style="font-size: 12px; opacity: 0.8;">SalNew User,</p><h3 style="font-size: 22px;"><span id="u-name"></span></h3></div>
+            <div><p style="font-size: 12px; opacity: 0.8;">SalNew User,</p><h3 style="font-size: 22px; font-weight: 800;"><span id="u-name"></span></h3></div>
             <div onclick="location.reload()" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:15px;"><i data-lucide="refresh-cw" size="20"></i></div>
         </div>
         <div class="grid-menu">
@@ -173,15 +190,29 @@
             <div class="m-item" onclick="location.reload();"><div class="m-icon" style="color:#ff3b30;"><i data-lucide="log-out"></i></div><p style="font-size: 11px;">Keluar</p></div>
         </div>
     </div>
-    <div class="s-card"><p style="font-size: 11px; color:#8e8e93; font-weight: 800;">SALDO</p><h2 id="u-balance" style="font-size: 34px; margin-top: 10px;">Rp 0</h2></div>
-    <div class="history" style="padding: 25px;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;"><h4 style="font-weight: 800;">Riwayat</h4><i data-lucide="trash-2" size="18" style="color:#ff3b30;" onclick="clearHistory()"></i></div><div id="hist-list"></div></div>
+
+    <div class="s-card">
+        <p style="font-size: 11px; color:#8e8e93; font-weight: 800; letter-spacing: 1px;">TOTAL SALDO</p>
+        <h2 id="u-balance" style="font-size: 36px; margin-top: 10px; font-weight: 900; color: #1c1c1e;">Rp 0</h2>
+    </div>
+
+    <div class="history" style="padding: 25px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+            <h4 style="font-weight: 800; font-size: 18px; color: #1c1c1e;">Riwayat</h4>
+            <i data-lucide="trash-2" size="18" style="color:#ff3b30; cursor: pointer;" onclick="clearHistory()"></i>
+        </div>
+        <div id="hist-list"></div>
+    </div>
 </div>
 
 <div id="transfer-screen">
-    <div style="display:flex; align-items:center; margin-bottom:40px;"><i data-lucide="chevron-left" size="30" onclick="closeTransfer()"></i><h3 style="margin-left: 15px;">SalNew</h3></div>
+    <div style="display:flex; align-items:center; margin-bottom:40px;">
+        <i data-lucide="chevron-left" size="30" onclick="closeTransfer()"></i>
+        <h3 style="margin-left: 15px; font-weight: 800;">SalNew Transfer</h3>
+    </div>
     <input type="text" id="tf-target" placeholder="Nomor Tujuan">
-    <input type="number" id="tf-amt" placeholder="Jumlah Rp">
-    <button class="btn-blue" onclick="processTransfer()">Konfirmasi</button>
+    <input type="number" id="tf-amt" placeholder="Jumlah Nominal (Rp)">
+    <button class="btn-blue" onclick="processTransfer()">Konfirmasi Transfer</button>
 </div>
 
 <script>lucide.createIcons();</script>
