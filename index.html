@@ -26,43 +26,32 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         
+        // UPDATE USER: Dafa dihapus, diganti PW
         const userDatabase = {
             "Tomi": { pin: "111111", phone: "081212" },
-            "Dafa": { pin: "112233", phone: "089999" }
+            "PW": { pin: "121212", phone: "085555" },
+            "T": { pin: "123456", phone: "087878" }
         };
 
         let currentBalance = 0;
         let touchStartY = 0;
         let touchEndY = 0;
 
-        // DETEKSI GESER LAYAR (SWIPE)
+        // GESTURE SWIPE (Masih ada sebagai fitur rahasia kamu)
         window.addEventListener('touchstart', e => { touchStartY = e.changedTouches[0].screenY; });
         window.addEventListener('touchend', e => { 
             touchEndY = e.changedTouches[0].screenY;
-            handleSwipe();
-        });
-
-        function handleSwipe() {
             const distance = touchStartY - touchEndY;
-            
-            // Geser Bawah ke Atas (Swipe Up) -> Login Tomi
             if (distance > 150 && document.getElementById('login-screen').style.display !== 'none') {
-                localStorage.setItem('rememberedUser', 'Tomi');
                 startApp('Tomi');
-                const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1000 });
-                Toast.fire({ icon: 'success', title: 'Welcome Back, Tomi' });
             }
-            
-            // Geser Atas ke Bawah (Swipe Down) -> Logout/Reset
             if (distance < -150 && document.getElementById('main-app').style.display !== 'none') {
-                localStorage.clear();
                 location.reload();
             }
-        }
+        });
 
+        // AUTO-LOGIN DIHAPUS (Halaman akan selalu buka di layar login)
         window.addEventListener('DOMContentLoaded', () => {
-            const savedUser = localStorage.getItem('rememberedUser');
-            if (savedUser) startApp(savedUser);
             lucide.createIcons();
         });
 
@@ -70,9 +59,10 @@
             const u = document.getElementById('inp-user').value;
             const p = document.getElementById('inp-pass').value;
             if (userDatabase[u] && userDatabase[u].pin === p) {
-                localStorage.setItem('rememberedUser', u);
                 startApp(u);
-            } else { Swal.fire('Gagal', 'PIN Salah', 'error'); }
+            } else { 
+                Swal.fire({ icon: 'error', title: 'Gagal', text: 'PIN Salah!' });
+            }
         };
 
         function startApp(user) {
@@ -109,7 +99,8 @@
                 const amount = parseInt(amt);
                 const sender = document.getElementById('u-name').innerText;
                 const senderPhone = userDatabase[sender].phone;
-                if (currentBalance < amount) { return Swal.fire('Gagal', 'Saldo kurang', 'error'); }
+                if (currentBalance < amount) { return Swal.fire('Gagal', 'Saldo tidak cukup', 'error'); }
+                
                 const tRef = ref(db, 'users/' + target);
                 const tSnap = await get(tRef);
                 if (tSnap.exists()) {
@@ -118,20 +109,20 @@
                     push(ref(db, 'history/' + target), { type: 'MASUK', amt: amount, date: now, note: 'Dari ' + sender });
                     await update(ref(db, 'users/' + senderPhone), { saldo: currentBalance - amount });
                     push(ref(db, 'history/' + senderPhone), { type: 'KELUAR', amt: amount, date: now, note: 'Ke ' + target });
-                    Swal.fire('Sukses', 'Berhasil', 'success');
+                    Swal.fire('Berhasil', 'Transfer Sukses', 'success');
                     closeTransfer();
-                } else { Swal.fire('Error', 'Nomor salah', 'error'); }
+                } else { Swal.fire('Error', 'Nomor tidak ditemukan', 'error'); }
             }
         };
 
         window.clearHistory = async () => {
             const user = document.getElementById('u-name').innerText;
             await remove(ref(db, 'history/' + userDatabase[user].phone));
-            Swal.fire('Selesai', 'Riwayat bersih', 'success');
+            Swal.fire('Bersih', 'Riwayat dihapus', 'success');
         };
 
         window.showMyQR = async () => {
-            const { value: amt } = await Swal.fire({ title: 'Nominal', input: 'number' });
+            const { value: amt } = await Swal.fire({ title: 'Jumlah', input: 'number' });
             if (amt) {
                 const myLink = `${window.location.origin}${window.location.pathname}?kaget=${amt}`;
                 Swal.fire({ title: 'SalNew QR', html: '<div id="qrcode" style="display:flex; justify-content:center; margin:20px 0;"></div>', didOpen: () => { new QRCode(document.getElementById("qrcode"), { text: myLink, width: 200, height: 200 }); } });
@@ -142,7 +133,7 @@
     <style>
         :root { --blue: #007aff; --bg: #f2f2f7; }
         * { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background: var(--bg); display: flex; justify-content: center; overflow: hidden; height: 100vh; width: 100vw; }
+        body { background: var(--bg); display: flex; justify-content: center; overflow: hidden; height: 100vh; }
         .app { width: 100%; max-width: 480px; min-height: 100vh; display: none; }
         #login-screen { width: 100%; max-width: 480px; height: 100vh; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
         .header { background: linear-gradient(135deg, #007aff, #5856d6); color: #fff; padding: 60px 25px 100px 25px; border-radius: 0 0 40px 40px; }
@@ -163,8 +154,7 @@
 
 <div id="login-screen">
     <div style="background:var(--blue); padding:20px; border-radius:25px; color:#fff; margin-bottom:20px;"><i data-lucide="shield-check" size="50"></i></div>
-    <h2 style="margin-bottom: 5px;">SalNew</h2>
-    <p style="font-size: 10px; color: #ccc; margin-bottom: 30px;">Swipe up to stealth login</p>
+    <h2 style="margin-bottom: 30px;">SalNew</h2>
     <input type="text" id="inp-user" placeholder="Username">
     <input type="password" id="inp-pass" placeholder="PIN" maxlength="6">
     <button class="btn-blue" onclick="login()">Masuk</button>
@@ -180,7 +170,7 @@
             <div class="m-item" onclick="openTransfer()"><div class="m-icon"><i data-lucide="send"></i></div><p style="font-size: 11px;">Kirim</p></div>
             <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="download"></i></div><p style="font-size: 11px;">Isi</p></div>
             <div class="m-item" onclick="showMyQR()"><div class="m-icon"><i data-lucide="qr-code"></i></div><p style="font-size: 11px;">Scan</p></div>
-            <div class="m-item" onclick="localStorage.clear(); location.reload();"><div class="m-icon" style="color:#ff3b30;"><i data-lucide="log-out"></i></div><p style="font-size: 11px;">Reset</p></div>
+            <div class="m-item" onclick="location.reload();"><div class="m-icon" style="color:#ff3b30;"><i data-lucide="log-out"></i></div><p style="font-size: 11px;">Keluar</p></div>
         </div>
     </div>
     <div class="s-card"><p style="font-size: 11px; color:#8e8e93; font-weight: 800;">SALDO</p><h2 id="u-balance" style="font-size: 34px; margin-top: 10px;">Rp 0</h2></div>
@@ -188,7 +178,7 @@
 </div>
 
 <div id="transfer-screen">
-    <div style="display:flex; align-items:center; margin-bottom:40px;"><i data-lucide="chevron-left" size="30" onclick="closeTransfer()"></i><h3 style="margin-left: 15px;">Kirim</h3></div>
+    <div style="display:flex; align-items:center; margin-bottom:40px;"><i data-lucide="chevron-left" size="30" onclick="closeTransfer()"></i><h3 style="margin-left: 15px;">SalNew</h3></div>
     <input type="text" id="tf-target" placeholder="Nomor Tujuan">
     <input type="number" id="tf-amt" placeholder="Jumlah Rp">
     <button class="btn-blue" onclick="processTransfer()">Konfirmasi</button>
