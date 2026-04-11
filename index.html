@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SalNew Diamond - Cloud Edition</title>
+    <title>SalNew Diamond Pro</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -11,101 +11,90 @@
     <style>
         :root { --bg: #0a0a0b; --card: #161618; --accent: #d4af37; --text: #ffffff; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background: var(--bg); color: var(--text); overflow: hidden; height: 100vh; }
+        body { background: var(--bg); color: var(--text); overflow: hidden; height: 100vh; width: 100vw; }
 
+        /* Animasi Transisi Layar */
+        .page-transition { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Login Full Layar */
         #login-overlay {
             position: fixed; inset: 0; background: #000; z-index: 1000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: 0.8s ease-in-out; padding: 30px;
+            transition: 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .login-box { width: 100%; max-width: 300px; }
-        .login-box input { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #333; background: #111; color: white; margin-bottom: 10px; outline: none; }
-        .btn-login { width: 100%; padding: 15px; border-radius: 12px; border: none; background: var(--accent); color: black; font-weight: 800; cursor: pointer; }
-        #gesture-zone { position: absolute; bottom: 0; left: 0; width: 100px; height: 150px; z-index: 1001; }
+        .login-box { width: 80%; max-width: 300px; text-align: center; }
+        .login-box input { width: 100%; padding: 16px; border-radius: 15px; border: 1px solid #222; background: #111; color: white; margin-bottom: 12px; font-size: 16px; }
+        .btn-login { width: 100%; padding: 16px; border-radius: 15px; border: none; background: var(--accent); color: #000; font-weight: 800; letter-spacing: 1px; }
 
-        .container { padding: 25px; height: 100vh; display: flex; flex-direction: column; }
+        /* Main Container */
+        .container { height: 100vh; display: flex; flex-direction: column; padding: 25px; transition: 0.5s; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .profile { display: flex; align-items: center; gap: 12px; }
-        .avatar { width: 45px; height: 45px; background: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        
+        /* Card Saldo */
+        .secure-card { background: linear-gradient(135deg, #1c1c1e 0%, #0a0a0a 100%); border-radius: 28px; padding: 25px; border: 1px solid rgba(212,175,55,0.2); position: relative; overflow: hidden; }
+        .secure-card::after { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(212,175,55,0.05) 0%, transparent 70%); }
 
-        .secure-card { background: var(--card); border-radius: 25px; padding: 25px; border: 1px solid rgba(212, 175, 55, 0.1); margin-bottom: 25px; }
-        .balance-label { font-size: 10px; letter-spacing: 2px; color: #666; margin-bottom: 8px; }
-        .balance-val { font-size: 32px; font-weight: 800; margin-bottom: 15px; }
+        /* Menu Actions */
+        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0; }
+        .btn-act { background: var(--card); border-radius: 22px; padding: 20px; display: flex; align-items: center; justify-content: center; gap: 12px; border: 1px solid #222; font-weight: 700; transition: 0.3s; }
+        .btn-act:active { transform: scale(0.95); background: #222; }
 
-        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
-        .btn-act { background: var(--card); border-radius: 20px; padding: 18px; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; border: 1px solid #222; }
-        .btn-act i { color: var(--accent); }
+        /* Riwayat */
+        .history-card { background: var(--card); border-radius: 25px; padding: 20px; flex: 1; overflow-y: auto; border: 1px solid #1c1c1e; }
+        .trx-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #222; }
 
-        .history-card { background: var(--card); border-radius: 20px; padding: 15px; min-height: 80px; flex: 1; overflow-y: auto; }
-        .trx-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #222; }
-
-        .bottom-nav { position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(22, 22, 24, 0.9); backdrop-filter: blur(15px); height: 70px; border-radius: 25px; display: flex; justify-content: space-around; align-items: center; }
-        .nav-icon { color: #444; }
-        .nav-icon.active { color: var(--accent); }
+        #gesture-zone { position: absolute; bottom: 0; left: 0; width: 120px; height: 180px; z-index: 1001; }
     </style>
 </head>
 <body>
 
 <div id="login-overlay">
-    <div class="login-box">
-        <h2 style="text-align:center; margin-bottom:30px;">SalNew <span style="color:var(--accent)">Diamond</span></h2>
+    <div class="login-box page-transition">
+        <h1 style="margin-bottom: 30px; letter-spacing: -1px;">SalNew <span style="color:var(--accent)">Diamond</span></h1>
         <input type="text" id="username" placeholder="Username">
-        <input type="password" id="password" placeholder="Password">
-        <button class="btn-login" onclick="validateLogin()">LOG IN</button>
+        <input type="password" id="password" placeholder="PIN/Password">
+        <button class="btn-login" onclick="validateLogin()">MASUK</button>
     </div>
     <div id="gesture-zone"></div>
 </div>
 
-<div class="container">
+<div class="container" id="main-app">
     <div class="header">
-        <div class="profile">
-            <div class="avatar"><i data-lucide="user" color="black"></i></div>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:45px; height:45px; background:var(--accent); border-radius:14px; display:flex; align-items:center; justify-content:center;"><i data-lucide="user" color="black"></i></div>
             <div>
-                <p style="font-size: 10px; color: var(--accent); font-weight: 700;">DIAMOND MEMBER</p>
-                <h3 id="display-name">Guest</h3>
+                <p style="font-size: 10px; color: var(--accent); font-weight: 800;">PREMIUM ACCOUNT</p>
+                <h3 id="display-name">Loading...</h3>
             </div>
         </div>
-        <i data-lucide="bell" color="#666"></i>
+        <i data-lucide="settings" color="#444"></i>
     </div>
 
-    <div class="secure-card">
-        <p class="balance-label">SECURE BALANCE</p>
-        <h1 class="balance-val" id="balance">Rp •••••••</h1>
+    <div class="secure-card page-transition">
+        <p style="font-size: 10px; color: #666; letter-spacing: 2px;">TOTAL BALANCE</p>
+        <h1 id="balance" style="font-size: 34px; margin: 10px 0;">Rp •••••••</h1>
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <p style="font-size: 10px; color: #444;">VALID THRU: 12/31</p>
-            <button onclick="toggleBalance()" style="background:none; border:none;"><i data-lucide="eye" color="var(--accent)" size="20"></i></button>
+            <p style="font-size: 10px; color: #444;">ID: 8829-0012</p>
+            <button onclick="toggleBalance()" style="background:none; border:none;"><i data-lucide="eye" color="var(--accent)"></i></button>
         </div>
     </div>
 
     <div class="actions">
-        <div class="btn-act" onclick="handleTransfer()"><i data-lucide="arrow-up-right"></i> Kirim</div>
-        <div class="btn-act" onclick="Swal.fire('Top Up', 'Maintenance', 'info')"><i data-lucide="plus"></i> Top Up</div>
+        <div class="btn-act" onclick="handleTransfer()"><i data-lucide="send" size="20"></i> Kirim</div>
+        <div class="btn-act" onclick="handleTopUp()"><i data-lucide="plus-circle" size="20"></i> Isi Saldo</div>
     </div>
 
-    <p style="font-size: 12px; color: #666; margin-bottom: 15px;">RECENT ACTIVITY</p>
-    <div class="history-card" id="history-list">
-        <p style="text-align:center; color:#444; padding:10px;">Memuat data...</p>
-    </div>
-</div>
-
-<div class="bottom-nav">
-    <i data-lucide="home" class="nav-icon active"></i>
-    <i data-lucide="pie-chart" class="nav-icon"></i>
-    <i data-lucide="wallet" class="nav-icon"></i>
-    <i data-lucide="settings" class="nav-icon"></i>
+    <p style="font-size: 12px; color: #444; margin-bottom: 15px; font-weight: 700;">TRANSAKSI TERAKHIR</p>
+    <div class="history-card" id="history-list"></div>
 </div>
 
 <script>
-    // Konfigurasi Database salnew-dcb42
+    // Config Firebase kamu
     const firebaseConfig = {
         apiKey: "AIzaSyChUThRDnt8FqJKz4-7BcAXT4a2-dMs474",
-        authDomain: "salnew-dcb42.firebaseapp.com",
         databaseURL: "https://salnew-dcb42-default-rtdb.firebaseio.com",
-        projectId: "salnew-dcb42",
-        storageBucket: "salnew-dcb42.firebasestorage.app",
-        messagingSenderId: "854802120877",
-        appId: "1:854802120877:web:05e87c54da7525d4c60624",
-        measurementId: "G-2BTC43968B"
+        projectId: "salnew-dcb42"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -115,32 +104,33 @@
     let currentSaldo = 0;
     let currentUser = "";
 
+    // Login Logic
     function validateLogin() {
         const u = document.getElementById('username').value;
         const p = document.getElementById('password').value;
-        // Akun: Bustomi Alfarizi atau Dafa (pass: 1122)
         if ((u === "Bustomi Alfarizi") || (u === "Dafa" && p === "1122")) {
             startApp(u);
         } else {
-            Swal.fire('Error', 'Cek Username/Password!', 'error');
+            Swal.fire('Gagal', 'Akses Ditolak!', 'error');
         }
     }
 
-    // Gesture rahasia kiri bawah untuk login cepat
+    // Gesture rahasia
     let startY = 0;
     document.getElementById('gesture-zone').addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
     document.getElementById('gesture-zone').addEventListener('touchend', e => {
-        if (startY - e.changedTouches[0].clientY > 70) startApp("Bustomi Alfarizi");
+        if (startY - e.changedTouches[0].clientY > 80) startApp("Bustomi Alfarizi");
     });
 
     function startApp(name) {
         currentUser = name;
         document.getElementById('display-name').innerText = name;
-        document.getElementById('login-overlay').style.transform = 'translateY(-100%)';
+        document.getElementById('login-overlay').style.opacity = '0';
+        setTimeout(() => { document.getElementById('login-overlay').style.display = 'none'; }, 600);
         
-        // Sinkronisasi Saldo Real-time
-        db.ref('users/' + name).on('value', (snap) => {
-            currentSaldo = snap.val() ? snap.val().saldo : 0;
+        // Listen saldo pengirim
+        db.ref('users/' + name + '/saldo').on('value', (snap) => {
+            currentSaldo = snap.val() || 0;
             if(isShow) document.getElementById('balance').innerText = 'Rp ' + currentSaldo.toLocaleString('id-ID');
         });
         loadHistory(name);
@@ -148,7 +138,7 @@
 
     function toggleBalance() {
         if(!isShow) {
-            Swal.fire({title:'Masukkan PIN', input:'password', inputAttributes:{maxlength:4}}).then(res => {
+            Swal.fire({title:'Masukkan PIN', input:'password'}).then(res => {
                 if(res.value === '1122') {
                     isShow = true;
                     document.getElementById('balance').innerText = 'Rp ' + currentSaldo.toLocaleString('id-ID');
@@ -163,24 +153,46 @@
     async function handleTransfer() {
         if(!isShow) return Swal.fire('Terkunci', 'Buka saldo dahulu', 'warning');
         
-        const { value: nomor } = await Swal.fire({title:'Nomor Tujuan', input:'number'});
-        if(!nomor) return;
+        const { value: target } = await Swal.fire({title:'Nomor/Nama Tujuan', input:'text', inputPlaceholder: 'Contoh: Dafa atau 0812...'});
+        if(!target) return;
 
-        const { value: nominal } = await Swal.fire({title:'Nominal Transfer', input:'number'});
-        
-        if(nominal && nominal <= currentSaldo) {
-            const newSaldo = currentSaldo - parseInt(nominal);
-            // Simpan ke Cloud Database
-            db.ref('users/' + currentUser).update({ saldo: newSaldo });
-            db.ref('history/' + currentUser).push({
-                title: `Transfer ke ${nomor}`,
-                amt: '-' + parseInt(nominal).toLocaleString('id-ID'),
-                time: new Date().toLocaleTimeString()
-            });
-            Swal.fire('Sukses', 'Saldo terkirim!', 'success');
-        } else {
-            Swal.fire('Gagal', 'Saldo tidak cukup!', 'error');
+        // CEK APAKAH TARGET ADA DI DATABASE
+        const checkTarget = await db.ref('users/' + target).once('value');
+        if(!checkTarget.exists()) {
+            return Swal.fire('Nomor Salah', 'Tujuan tidak ditemukan di database!', 'error');
         }
+
+        const { value: amt } = await Swal.fire({title:'Nominal', input:'number'});
+        if(!amt || amt <= 0) return;
+
+        if(amt <= currentSaldo) {
+            const nominal = parseInt(amt);
+            
+            // 1. Kurangi Saldo Pengirim
+            db.ref('users/' + currentUser).update({ saldo: currentSaldo - nominal });
+            
+            // 2. Tambah Saldo Penerima (LOGIKA FIX)
+            const targetSaldo = checkTarget.val().saldo || 0;
+            db.ref('users/' + target).update({ saldo: targetSaldo + nominal });
+
+            // 3. Catat Riwayat
+            db.ref('history/' + currentUser).push({ title: `Kirim ke ${target}`, amt: '-' + nominal.toLocaleString('id-ID'), time: 'Sukses' });
+            db.ref('history/' + target).push({ title: `Terima dari ${currentUser}`, amt: '+' + nominal.toLocaleString('id-ID'), time: 'Sukses' });
+
+            Swal.fire('Berhasil', 'Transfer ke ' + target + ' sukses!', 'success');
+        } else {
+            Swal.fire('Gagal', 'Saldo Anda tidak cukup!', 'error');
+        }
+    }
+
+    function handleTopUp() {
+        Swal.fire({title:'Top Up', input:'number', inputPlaceholder:'Nominal'}).then(res => {
+            if(res.value) {
+                const val = parseInt(res.value);
+                db.ref('users/' + currentUser).update({ saldo: currentSaldo + val });
+                db.ref('history/' + currentUser).push({ title: 'Isi Saldo', amt: '+' + val.toLocaleString('id-ID'), time: 'Online' });
+            }
+        });
     }
 
     function loadHistory(user) {
@@ -188,11 +200,12 @@
             const list = document.getElementById('history-list');
             list.innerHTML = "";
             snap.forEach(child => {
-                const data = child.val();
+                const d = child.val();
+                const color = d.amt.includes('+') ? '#34c759' : '#ff3b30';
                 list.insertAdjacentHTML('afterbegin', `
-                    <div class="trx-item">
-                        <div><p style="font-size:14px; font-weight:700;">${data.title}</p><small style="color:#444;">${data.time}</small></div>
-                        <p style="color:#ff3b30; font-weight:800;">${data.amt}</p>
+                    <div class="trx-item page-transition">
+                        <div><p style="font-size:14px; font-weight:700;">${d.title}</p><small style="color:#444;">${d.time}</small></div>
+                        <p style="color:${color}; font-weight:800;">${d.amt}</p>
                     </div>
                 `);
             });
