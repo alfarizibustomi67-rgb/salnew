@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SalNew Diamond Pro</title>
+    <title>SalNew Diamond - Full Access</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -13,48 +13,56 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background: var(--bg); color: var(--text); overflow: hidden; height: 100vh; width: 100vw; }
 
-        /* Animasi Transisi Layar */
-        .page-transition { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Animasi Mulus */
+        .fade-in { animation: fadeIn 0.6s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
-        /* Login Full Layar */
+        /* Login Screen */
         #login-overlay {
             position: fixed; inset: 0; background: #000; z-index: 1000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .login-box { width: 80%; max-width: 300px; text-align: center; }
-        .login-box input { width: 100%; padding: 16px; border-radius: 15px; border: 1px solid #222; background: #111; color: white; margin-bottom: 12px; font-size: 16px; }
-        .btn-login { width: 100%; padding: 16px; border-radius: 15px; border: none; background: var(--accent); color: #000; font-weight: 800; letter-spacing: 1px; }
+        .login-box { width: 85%; max-width: 320px; text-align: center; }
+        .login-box input { width: 100%; padding: 18px; border-radius: 15px; border: 1px solid #222; background: #111; color: white; margin-bottom: 12px; font-size: 16px; outline: none; }
+        .btn-login { width: 100%; padding: 18px; border-radius: 15px; border: none; background: var(--accent); color: #000; font-weight: 800; cursor: pointer; }
 
         /* Main Container */
-        .container { height: 100vh; display: flex; flex-direction: column; padding: 25px; transition: 0.5s; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .container { height: 100vh; display: flex; flex-direction: column; padding: 25px; visibility: hidden; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
         
-        /* Card Saldo */
-        .secure-card { background: linear-gradient(135deg, #1c1c1e 0%, #0a0a0a 100%); border-radius: 28px; padding: 25px; border: 1px solid rgba(212,175,55,0.2); position: relative; overflow: hidden; }
-        .secure-card::after { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(212,175,55,0.05) 0%, transparent 70%); }
+        /* Card Saldo - Tanpa Fitur Sembunyi */
+        .secure-card { 
+            background: linear-gradient(145deg, #1e1e20, #0f0f10); 
+            border-radius: 30px; padding: 30px; 
+            border: 1px solid rgba(212,175,55,0.2); 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .balance-val { font-size: 36px; font-weight: 800; color: #fff; margin-top: 10px; text-shadow: 0 2px 10px rgba(212,175,55,0.3); }
 
-        /* Menu Actions */
+        /* Tombol Berfungsi Semua */
         .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0; }
-        .btn-act { background: var(--card); border-radius: 22px; padding: 20px; display: flex; align-items: center; justify-content: center; gap: 12px; border: 1px solid #222; font-weight: 700; transition: 0.3s; }
-        .btn-act:active { transform: scale(0.95); background: #222; }
+        .btn-act { 
+            background: var(--card); border-radius: 22px; padding: 20px; 
+            display: flex; align-items: center; justify-content: center; 
+            gap: 12px; border: 1px solid #222; font-weight: 700; transition: 0.2s;
+        }
+        .btn-act:active { transform: scale(0.92); background: #222; }
 
-        /* Riwayat */
-        .history-card { background: var(--card); border-radius: 25px; padding: 20px; flex: 1; overflow-y: auto; border: 1px solid #1c1c1e; }
+        .history-card { background: var(--card); border-radius: 25px; padding: 20px; flex: 1; overflow-y: auto; }
         .trx-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #222; }
 
-        #gesture-zone { position: absolute; bottom: 0; left: 0; width: 120px; height: 180px; z-index: 1001; }
+        #gesture-zone { position: absolute; bottom: 0; left: 0; width: 100px; height: 150px; z-index: 1001; }
     </style>
 </head>
 <body>
 
 <div id="login-overlay">
-    <div class="login-box page-transition">
-        <h1 style="margin-bottom: 30px; letter-spacing: -1px;">SalNew <span style="color:var(--accent)">Diamond</span></h1>
+    <div class="login-box">
+        <h1 style="margin-bottom: 35px;">SalNew <span style="color:var(--accent)">Diamond</span></h1>
         <input type="text" id="username" placeholder="Username">
-        <input type="password" id="password" placeholder="PIN/Password">
-        <button class="btn-login" onclick="validateLogin()">MASUK</button>
+        <input type="password" id="password" placeholder="Password">
+        <button class="btn-login" onclick="validateLogin()">LOG IN</button>
     </div>
     <div id="gesture-zone"></div>
 </div>
@@ -62,35 +70,32 @@
 <div class="container" id="main-app">
     <div class="header">
         <div style="display:flex; align-items:center; gap:12px;">
-            <div style="width:45px; height:45px; background:var(--accent); border-radius:14px; display:flex; align-items:center; justify-content:center;"><i data-lucide="user" color="black"></i></div>
+            <div style="width:45px; height:45px; background:var(--accent); border-radius:12px; display:flex; align-items:center; justify-content:center;"><i data-lucide="user" color="black"></i></div>
             <div>
-                <p style="font-size: 10px; color: var(--accent); font-weight: 800;">PREMIUM ACCOUNT</p>
-                <h3 id="display-name">Loading...</h3>
+                <p style="font-size: 10px; color: var(--accent); font-weight: 800;">OFFICIAL MEMBER</p>
+                <h3 id="display-name">Username</h3>
             </div>
         </div>
-        <i data-lucide="settings" color="#444"></i>
+        <i data-lucide="bell" color="#444"></i>
     </div>
 
-    <div class="secure-card page-transition">
-        <p style="font-size: 10px; color: #666; letter-spacing: 2px;">TOTAL BALANCE</p>
-        <h1 id="balance" style="font-size: 34px; margin: 10px 0;">Rp •••••••</h1>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <p style="font-size: 10px; color: #444;">ID: 8829-0012</p>
-            <button onclick="toggleBalance()" style="background:none; border:none;"><i data-lucide="eye" color="var(--accent)"></i></button>
-        </div>
+    <div class="secure-card fade-in">
+        <p style="font-size: 11px; color: #666; letter-spacing: 2px;">SALDO AKTIF</p>
+        <h1 class="balance-val" id="balance">Rp 0</h1>
+        <p style="font-size: 10px; color: #444; margin-top: 15px;">PROTECTED BY FIREBASE CLOUD</p>
     </div>
 
     <div class="actions">
-        <div class="btn-act" onclick="handleTransfer()"><i data-lucide="send" size="20"></i> Kirim</div>
-        <div class="btn-act" onclick="handleTopUp()"><i data-lucide="plus-circle" size="20"></i> Isi Saldo</div>
+        <div class="btn-act" onclick="handleTransfer()"><i data-lucide="send" size="22"></i> Kirim</div>
+        <div class="btn-act" onclick="handleTopUp()"><i data-lucide="download" size="22"></i> Top Up</div>
     </div>
 
-    <p style="font-size: 12px; color: #444; margin-bottom: 15px; font-weight: 700;">TRANSAKSI TERAKHIR</p>
+    <p style="font-size: 12px; color: #444; margin-bottom: 15px; font-weight: 700;">RIWAYAT TRANSAKSI</p>
     <div class="history-card" id="history-list"></div>
 </div>
 
 <script>
-    // Config Firebase kamu
+    // Firebase Config asli milikmu
     const firebaseConfig = {
         apiKey: "AIzaSyChUThRDnt8FqJKz4-7BcAXT4a2-dMs474",
         databaseURL: "https://salnew-dcb42-default-rtdb.firebaseio.com",
@@ -100,22 +105,21 @@
     const db = firebase.database();
 
     lucide.createIcons();
-    let isShow = false;
     let currentSaldo = 0;
     let currentUser = "";
 
-    // Login Logic
     function validateLogin() {
         const u = document.getElementById('username').value;
         const p = document.getElementById('password').value;
+        // Akun default atau rahasia
         if ((u === "Bustomi Alfarizi") || (u === "Dafa" && p === "1122")) {
             startApp(u);
         } else {
-            Swal.fire('Gagal', 'Akses Ditolak!', 'error');
+            Swal.fire('Error', 'Username atau Password salah!', 'error');
         }
     }
 
-    // Gesture rahasia
+    // Gesture rahasia (Geser ke atas di kiri bawah)
     let startY = 0;
     document.getElementById('gesture-zone').addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
     document.getElementById('gesture-zone').addEventListener('touchend', e => {
@@ -126,71 +130,71 @@
         currentUser = name;
         document.getElementById('display-name').innerText = name;
         document.getElementById('login-overlay').style.opacity = '0';
-        setTimeout(() => { document.getElementById('login-overlay').style.display = 'none'; }, 600);
+        document.getElementById('main-app').style.visibility = 'visible';
+        setTimeout(() => { document.getElementById('login-overlay').style.display = 'none'; }, 500);
         
-        // Listen saldo pengirim
+        // Saldo Langsung Muncul (Real-time)
         db.ref('users/' + name + '/saldo').on('value', (snap) => {
             currentSaldo = snap.val() || 0;
-            if(isShow) document.getElementById('balance').innerText = 'Rp ' + currentSaldo.toLocaleString('id-ID');
+            document.getElementById('balance').innerText = 'Rp ' + currentSaldo.toLocaleString('id-ID');
         });
         loadHistory(name);
     }
 
-    function toggleBalance() {
-        if(!isShow) {
-            Swal.fire({title:'Masukkan PIN', input:'password'}).then(res => {
-                if(res.value === '1122') {
-                    isShow = true;
-                    document.getElementById('balance').innerText = 'Rp ' + currentSaldo.toLocaleString('id-ID');
-                }
-            });
-        } else {
-            document.getElementById('balance').innerText = 'Rp •••••••';
-            isShow = false;
-        }
-    }
-
+    // LOGIKA KIRIM: Cek nomor tujuan dan pindahkan saldo
     async function handleTransfer() {
-        if(!isShow) return Swal.fire('Terkunci', 'Buka saldo dahulu', 'warning');
-        
-        const { value: target } = await Swal.fire({title:'Nomor/Nama Tujuan', input:'text', inputPlaceholder: 'Contoh: Dafa atau 0812...'});
-        if(!target) return;
+        const { value: target } = await Swal.fire({
+            title: 'Kirim Ke Siapa?',
+            input: 'text',
+            inputPlaceholder: 'Masukkan Nama/Nomor User',
+            confirmButtonColor: '#d4af37'
+        });
 
-        // CEK APAKAH TARGET ADA DI DATABASE
-        const checkTarget = await db.ref('users/' + target).once('value');
-        if(!checkTarget.exists()) {
-            return Swal.fire('Nomor Salah', 'Tujuan tidak ditemukan di database!', 'error');
+        if (!target) return;
+
+        // Cek apakah user tujuan ada
+        const targetRef = await db.ref('users/' + target).once('value');
+        if (!targetRef.exists()) {
+            return Swal.fire('Gagal', 'Nomor tujuan tidak terdaftar!', 'error');
         }
 
-        const { value: amt } = await Swal.fire({title:'Nominal', input:'number'});
-        if(!amt || amt <= 0) return;
+        const { value: amt } = await Swal.fire({
+            title: 'Nominal Transfer',
+            input: 'number',
+            confirmButtonColor: '#d4af37'
+        });
 
-        if(amt <= currentSaldo) {
+        if (amt && parseInt(amt) <= currentSaldo && parseInt(amt) > 0) {
             const nominal = parseInt(amt);
-            
-            // 1. Kurangi Saldo Pengirim
-            db.ref('users/' + currentUser).update({ saldo: currentSaldo - nominal });
-            
-            // 2. Tambah Saldo Penerima (LOGIKA FIX)
-            const targetSaldo = checkTarget.val().saldo || 0;
-            db.ref('users/' + target).update({ saldo: targetSaldo + nominal });
+            const saldoPenerima = targetRef.val().saldo || 0;
 
-            // 3. Catat Riwayat
+            // Proses Transfer
+            db.ref('users/' + currentUser).update({ saldo: currentSaldo - nominal });
+            db.ref('users/' + target).update({ saldo: saldoPenerima + nominal });
+
+            // Catat History
             db.ref('history/' + currentUser).push({ title: `Kirim ke ${target}`, amt: '-' + nominal.toLocaleString('id-ID'), time: 'Sukses' });
             db.ref('history/' + target).push({ title: `Terima dari ${currentUser}`, amt: '+' + nominal.toLocaleString('id-ID'), time: 'Sukses' });
 
-            Swal.fire('Berhasil', 'Transfer ke ' + target + ' sukses!', 'success');
+            Swal.fire('Berhasil', 'Transfer Berhasil!', 'success');
         } else {
-            Swal.fire('Gagal', 'Saldo Anda tidak cukup!', 'error');
+            Swal.fire('Gagal', 'Saldo tidak cukup!', 'error');
         }
     }
 
+    // LOGIKA TOP UP: Berfungsi langsung nambah ke Firebase
     function handleTopUp() {
-        Swal.fire({title:'Top Up', input:'number', inputPlaceholder:'Nominal'}).then(res => {
-            if(res.value) {
+        Swal.fire({
+            title: 'Top Up Diamond',
+            input: 'number',
+            inputPlaceholder: 'Masukkan Nominal',
+            confirmButtonColor: '#d4af37'
+        }).then(res => {
+            if (res.value) {
                 const val = parseInt(res.value);
                 db.ref('users/' + currentUser).update({ saldo: currentSaldo + val });
-                db.ref('history/' + currentUser).push({ title: 'Isi Saldo', amt: '+' + val.toLocaleString('id-ID'), time: 'Online' });
+                db.ref('history/' + currentUser).push({ title: 'Top Up Cloud', amt: '+' + val.toLocaleString('id-ID'), time: 'Online' });
+                Swal.fire('Sukses', 'Saldo berhasil ditambahkan!', 'success');
             }
         });
     }
@@ -203,7 +207,7 @@
                 const d = child.val();
                 const color = d.amt.includes('+') ? '#34c759' : '#ff3b30';
                 list.insertAdjacentHTML('afterbegin', `
-                    <div class="trx-item page-transition">
+                    <div class="trx-item fade-in">
                         <div><p style="font-size:14px; font-weight:700;">${d.title}</p><small style="color:#444;">${d.time}</small></div>
                         <p style="color:${color}; font-weight:800;">${d.amt}</p>
                     </div>
