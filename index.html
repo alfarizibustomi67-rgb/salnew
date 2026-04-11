@@ -8,133 +8,201 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root { --primary: #007aff; --bg: #f2f2f7; --card: #ffffff; }
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, sans-serif; }
-        body { background: var(--bg); color: #1c1c1e; }
-        
-        .nav-top { background: var(--primary); color: white; padding: 50px 20px 30px; border-radius: 0 0 30px 30px; box-shadow: 0 10px 20px rgba(0,122,255,0.2); }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: #1c1c1e; overflow: hidden; }
+
+        /* Login Screen */
+        #login-overlay {
+            position: fixed; inset: 0; background: #000; z-index: 1000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; transition: 0.8s cubic-bezier(0.4, 0, 0.2, 1); padding: 30px;
+        }
+        .login-box { width: 100%; max-width: 320px; }
+        .input-group { margin-bottom: 15px; }
+        .input-group input { 
+            width: 100%; padding: 15px; border-radius: 12px; border: none; 
+            background: #1c1c1e; color: white; font-size: 14px; outline: none;
+            border: 1px solid #333;
+        }
+        .btn-login { 
+            width: 100%; padding: 15px; border-radius: 12px; border: none; 
+            background: var(--primary); color: white; font-weight: 700; cursor: pointer;
+        }
+
+        /* Invisible Gesture Zone */
+        #gesture-zone { position: absolute; bottom: 0; left: 0; width: 100px; height: 150px; background: transparent; z-index: 1001; }
+
+        /* Main App UI */
+        .nav-top { background: var(--primary); color: white; padding: 50px 20px 30px; border-radius: 0 0 30px 30px; }
         .user-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .wallet-card { background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); }
-        
-        .menu-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 25px; margin-top: -20px; }
-        .menu-item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: #1c1c1e; }
-        .icon-btn { width: 55px; height: 55px; background: white; border-radius: 18px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); color: var(--primary); }
+
+        .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; padding: 25px; margin-top: -20px; }
+        .menu-item { display: flex; align-items: center; background: white; padding: 18px; border-radius: 22px; color: #1c1c1e; box-shadow: 0 5px 15px rgba(0,0,0,0.05); cursor: pointer; }
+        .icon-btn { width: 45px; height: 45px; background: #f2f2f7; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-right: 12px; color: var(--primary); }
 
         .section { padding: 0 25px 100px; }
-        .history-card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.03); }
-        .item-trx { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f2f2f7; }
-        .item-trx:last-child { border: none; }
+        .history-card { background: white; border-radius: 25px; padding: 20px; min-height: 100px; }
+        .item-trx { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f2f2f7; }
 
-        /* Floating Nav */
-        .bottom-nav { position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(28,28,30,0.9); backdrop-filter: blur(15px); border-radius: 25px; height: 65px; display: flex; justify-content: space-around; align-items: center; color: white; }
+        .bottom-nav { position: fixed; bottom: 20px; left: 20px; right: 20px; background: #1c1c30; border-radius: 25px; height: 70px; display: flex; justify-content: space-around; align-items: center; color: white; }
+        .nav-icon { color: #555; }
+        .nav-icon.active { color: var(--primary); }
     </style>
 </head>
 <body>
 
+<div id="login-overlay">
+    <div class="login-box">
+        <div style="text-align: center; margin-bottom: 40px;">
+            <i data-lucide="shield-check" size="48" style="color: var(--primary); margin-bottom: 15px;"></i>
+            <h2 style="letter-spacing: -1px;">SalNew Login</h2>
+        </div>
+        <div class="input-group">
+            <input type="text" id="username" placeholder="Username">
+        </div>
+        <div class="input-group">
+            <input type="password" id="password" placeholder="Password">
+        </div>
+        <button class="btn-login" onclick="validateLogin()">MASUK</button>
+    </div>
+    <div id="gesture-zone"></div>
+</div>
+
 <div class="nav-top">
     <div class="user-info">
         <div>
-            <p style="opacity: 0.8; font-size: 14px;">Selamat Datang,</p>
-            <h2 id="display-name" style="letter-spacing: -1px;">User SalNew</h2>
+            <p style="opacity: 0.8; font-size: 13px;">Selamat Datang,</p>
+            <h2 id="user-display" style="letter-spacing: -1px;">User</h2>
         </div>
-        <i data-lucide="bell"></i>
+        <i data-lucide="power" onclick="location.reload()" style="opacity: 0.6;"></i>
     </div>
     <div class="wallet-card">
-        <p style="font-size: 12px; font-weight: 600; margin-bottom: 5px;">TOTAL SALDO</p>
+        <p style="font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 5px;">TOTAL SALDO</p>
         <div style="display: flex; align-items: center; justify-content: space-between;">
-            <h1 id="balance" style="font-size: 32px;">Rp •••••••</h1>
-            <button onclick="toggleBalance()" style="background: none; border: none; color: white;"><i data-lucide="eye" id="eye-icon"></i></button>
+            <h1 id="balance" style="font-size: 34px; font-weight: 800;">Rp •••••••</h1>
+            <button onclick="toggleBalance()" style="background: none; border: none; color: white;"><i data-lucide="eye"></i></button>
         </div>
     </div>
 </div>
 
 <div class="menu-grid">
-    <a href="#" class="menu-item" onclick="featureDev()">
-        <div class="icon-btn"><i data-lucide="arrow-up-right"></i></div>
-        <span style="font-size: 11px; font-weight: 700;">Transfer</span>
-    </a>
-    <a href="slot.html" class="menu-item">
-        <div class="icon-btn" style="color: #ff9500;"><i data-lucide="layout-grid"></i></div>
-        <span style="font-size: 11px; font-weight: 700;">Slot</span>
-    </a>
-    <a href="block.html" class="menu-item">
-        <div class="icon-btn" style="color: #34c759;"><i data-lucide="gamepad-2"></i></div>
-        <span style="font-size: 11px; font-weight: 700;">Games</span>
-    </a>
-    <a href="#" class="menu-item" onclick="featureDev()">
-        <div class="icon-btn" style="color: #ff3b30;"><i data-lucide="plus-circle"></i></div>
-        <span style="font-size: 11px; font-weight: 700;">TopUp</span>
-    </a>
+    <div class="menu-item" onclick="handleTransfer()">
+        <div class="icon-btn"><i data-lucide="send" size="20"></i></div>
+        <span style="font-size: 14px; font-weight: 800;">Transfer</span>
+    </div>
+    <div class="menu-item" onclick="handleTopUp()">
+        <div class="icon-btn" style="color: #34c759;"><i data-lucide="arrow-up-circle" size="20"></i></div>
+        <span style="font-size: 14px; font-weight: 800;">Top Up</span>
+    </div>
 </div>
 
 <div class="section">
-    <h3 style="margin-bottom: 15px;">Riwayat Transaksi</h3>
+    <h3 style="margin-bottom: 15px; font-size: 16px;">Riwayat Transaksi</h3>
     <div class="history-card" id="history-list">
-        <p style="text-align: center; color: #8e8e93; padding: 20px;">Belum ada transaksi</p>
+        <p id="empty-msg" style="text-align: center; color: #aaa; padding: 20px; font-size: 13px;">Belum ada aktivitas hari ini</p>
     </div>
 </div>
 
 <div class="bottom-nav">
-    <i data-lucide="home" style="color: var(--primary);"></i>
-    <i data-lucide="pie-chart" onclick="featureDev()"></i>
-    <i data-lucide="user" onclick="featureDev()"></i>
-    <i data-lucide="settings" onclick="featureDev()"></i>
+    <i data-lucide="home" class="nav-icon active"></i>
+    <i data-lucide="pie-chart" class="nav-icon"></i>
+    <i data-lucide="wallet" class="nav-icon"></i>
+    <i data-lucide="settings" class="nav-icon"></i>
 </div>
 
 <script>
     lucide.createIcons();
     let isShow = false;
-    let realSaldo = 500000; // Nanti ini ambil dari Firebase kamu
+    let realSaldo = 1250000;
+
+    function validateLogin() {
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+        if ((user === "Bustomi Alfarizi") || (user === "Dafa" && pass === "1122")) {
+            enterApp(user);
+        } else {
+            Swal.fire('Gagal', 'Username atau Password salah!', 'error');
+        }
+    }
+
+    let startY = 0;
+    document.getElementById('gesture-zone').addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
+    document.getElementById('gesture-zone').addEventListener('touchend', e => {
+        if (startY - e.changedTouches[0].clientY > 70) enterApp("Bustomi Alfarizi");
+    });
+
+    function enterApp(name) {
+        document.getElementById('user-display').innerText = name;
+        document.getElementById('login-overlay').style.transform = 'translateY(-100%)';
+    }
 
     function toggleBalance() {
-        const balEl = document.getElementById('balance');
-        const eye = document.getElementById('eye-icon');
-        
         if (!isShow) {
-            // Cek PIN simulasi
             Swal.fire({
-                title: 'Masukkan PIN',
+                title: 'PIN Akses',
                 input: 'password',
-                inputAttributes: { maxlength: 6, autofocus: 'true' },
-                showCancelButton: true
-            }).then((result) => {
-                if (result.value === '1122') { // Password dari Saved Info kamu
-                    balEl.innerText = 'Rp ' + realSaldo.toLocaleString('id-ID');
+                inputAttributes: { maxlength: 4 },
+                confirmButtonColor: '#007aff'
+            }).then((res) => {
+                if (res.value === '1122') {
+                    document.getElementById('balance').innerText = 'Rp ' + realSaldo.toLocaleString('id-ID');
                     isShow = true;
-                } else if (result.isConfirmed) {
-                    Swal.fire('Error', 'PIN Salah!', 'error');
+                } else if (res.isConfirmed) {
+                    Swal.fire('Gagal', 'PIN Salah!', 'error');
                 }
             });
         } else {
-            balEl.innerText = 'Rp •••••••';
+            document.getElementById('balance').innerText = 'Rp •••••••';
             isShow = false;
         }
     }
 
-    function featureDev() {
-        Swal.fire({
-            title: 'Segera Hadir',
-            text: 'Fitur ini sedang disiapkan untuk update minggu depan!',
-            icon: 'info',
-            confirmButtonColor: '#007aff'
+    async function handleTransfer() {
+        if(!isShow) return Swal.fire('Terkunci', 'Buka saldo dahulu.', 'info');
+
+        // Step 1: Input Nomor
+        const { value: nomor } = await Swal.fire({
+            title: 'Nomor Tujuan',
+            input: 'number',
+            inputPlaceholder: 'Contoh: 08123456789',
+            confirmButtonText: 'Lanjut',
+            confirmButtonColor: '#007aff',
+            showCancelButton: true
         });
+
+        if (nomor) {
+            // Step 2: Input Nominal
+            const { value: nominal } = await Swal.fire({
+                title: 'Nominal Transfer',
+                input: 'number',
+                inputPlaceholder: 'Rp 0',
+                confirmButtonText: 'Kirim',
+                confirmButtonColor: '#007aff',
+                showCancelButton: true
+            });
+
+            if (nominal && nominal <= realSaldo) {
+                realSaldo -= parseInt(nominal);
+                document.getElementById('balance').innerText = 'Rp ' + realSaldo.toLocaleString('id-ID');
+                addH(`Transfer ke ${nomor}`, '-' + parseInt(nominal).toLocaleString('id-ID'), '#ff3b30');
+                Swal.fire('Berhasil', `Dana terkirim ke ${nomor}`, 'success');
+            } else if (nominal > realSaldo) {
+                Swal.fire('Gagal', 'Saldo tidak cukup!', 'error');
+            }
+        }
     }
 
-    // Simulasi Riwayat
-    const hx = [
-        { type: 'Bonus', amt: '+10.000', date: 'Hari ini', color: '#34c759' },
-        { type: 'Slot Game', amt: '-5.000', date: 'Kemarin', color: '#ff3b30' }
-    ];
-    
-    document.getElementById('history-list').innerHTML = hx.map(item => `
-        <div class="item-trx">
-            <div>
-                <p style="font-weight: 700;">${item.type}</p>
-                <small style="color: #8e8e93;">${item.date}</small>
-            </div>
-            <p style="font-weight: 800; color: ${item.color}">${item.amt}</p>
-        </div>
-    `).join('');
+    function handleTopUp() {
+        Swal.fire('Top Up', 'Layanan ini sedang maintenance.', 'info');
+    }
 
+    function addH(t, a, c) {
+        document.getElementById('empty-msg').style.display = 'none';
+        const list = document.getElementById('history-list');
+        const h = `<div class="item-trx"><div><p style="font-weight:700; font-size:14px;">${t}</p><small style="color:#8e8e93;">Baru saja</small></div><p style="font-weight:800; color:${c}">${a}</p></div>`;
+        list.insertAdjacentHTML('afterbegin', h);
+    }
 </script>
 </body>
 </html>
